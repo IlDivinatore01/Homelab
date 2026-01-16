@@ -557,10 +557,10 @@ optimize_databases() {
   # FIREFLY (MariaDB)
   local FIREFLY_CONT="firefly-pod-firefly-db"
   if podman container exists "$FIREFLY_CONT" && [ "$(podman container inspect -f '{{.State.Running}}' "$FIREFLY_CONT")" == "true" ]; then
-    info "Optimizing Firefly Database (mysqlcheck)..."
+    info "Optimizing Firefly Database (mariadb-check)..."
     local db_user db_pass
     db_user="$(podman exec "$FIREFLY_CONT" printenv MYSQL_USER | tr -d '\r')"
-    podman exec "$FIREFLY_CONT" sh -c 'mysqlcheck -h 127.0.0.1 -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" --optimize --databases "$MYSQL_DATABASE"'
+    podman exec "$FIREFLY_CONT" sh -c 'mariadb-check -h 127.0.0.1 -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" --optimize --databases "$MYSQL_DATABASE"'
     success "Firefly Done."
   else
     warn "Firefly Database not running, skipping."

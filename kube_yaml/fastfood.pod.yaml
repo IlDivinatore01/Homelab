@@ -8,6 +8,11 @@ metadata:
 spec:
   automountServiceAccountToken: false
   restartPolicy: Always
+  volumes:
+  - name: uploaded-images
+    hostPath:
+      path: /home/osvaldo/podman/data/fastfood/uploads
+      type: DirectoryOrCreate
   containers:
   # Single Container: Node.js Backend (serves both API and static files)
   # Simplified from 2-container architecture (removed Caddy sidecar)
@@ -34,6 +39,9 @@ spec:
           key: secret
     - name: ALLOWED_ORIGINS
       value: "https://fastfood.simonemiglio.eu"
+    volumeMounts:
+    - name: uploaded-images
+      mountPath: /app/frontend/public/images/uploads
     resources:
       requests:
         cpu: "100m"
