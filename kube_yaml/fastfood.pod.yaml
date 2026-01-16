@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fastfood-pod
+  labels:
+    app: fastfood
+    io.containers.autoupdate: "image"
+spec:
+  automountServiceAccountToken: false
+  restartPolicy: Always
+  containers:
+  # Single Container: Node.js Backend (serves both API and static files)
+  # Simplified from 2-container architecture (removed Caddy sidecar)
+  - name: backend
+    image: localhost/fastfood-backend:1.0.0
+    ports:
+    - name: http
+      containerPort: 3000
+      hostPort: 5000  # Keep external port 5000 for compatibility
+    env:
+    - name: NODE_ENV
+      value: "production"
+    - name: PORT
+      value: "3000"
+    - name: MONGO_URI
+      valueFrom:
+        secretKeyRef:
+          name: fastfood-mongo-uri
+          key: uri
+    - name: JWT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: fastfood-jwt-secret
+          key: secret
+    - name: ALLOWED_ORIGINS
+      value: "https://fastfood.simonemiglio.eu"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        memory: "512Mi"

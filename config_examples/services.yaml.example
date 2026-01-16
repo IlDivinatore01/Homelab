@@ -1,0 +1,61 @@
+# ===========================================
+# Homepage Services Configuration
+# ===========================================
+# Copy to data/homepage/config/services.yaml
+
+- Media:
+    - Immich:
+        icon: immich.png
+        href: https://gallery.yourdomain.com
+        description: Photo Management & AI
+        ping: http://immich-server:2283
+        widget:
+          type: immich
+          url: http://immich-server:2283
+          key: YOUR_IMMICH_API_KEY
+          version: 2
+
+- Finance:
+    - Firefly III:
+        icon: firefly.png
+        href: https://finanza.yourdomain.com
+        description: Personal Finance Manager
+        ping: http://firefly-pod:8080
+    - Firefly Importer:
+        icon: firefly.png
+        href: https://importer.finanza.yourdomain.com
+        description: Transaction Importer
+        ping: http://firefly-importer-pod:8080
+
+- Admin & Monitoring:
+    - Portainer:
+        icon: portainer.png
+        href: https://portainer.yourdomain.com
+        description: Container Management
+        ping: http://portainer-pod:9000
+    - Cockpit:
+        icon: si-cockpit
+        href: https://panel.yourdomain.com
+        description: System & Podman UI
+    - Uptime Kuma:
+        icon: uptime-kuma.png
+        href: https://status.yourdomain.com
+        description: Uptime Monitoring
+        ping: http://uptime-kuma-pod:3001
+    - IT-Tools:
+        icon: mdi-toolbox
+        href: https://tools.yourdomain.com
+        description: Developer Utilities
+        ping: http://it-tools-pod:80
+
+- Projects:
+    - Portfolio:
+        icon: si-html5
+        href: https://yourdomain.com
+        description: Personal Website
+        ping: http://main-pod:8080
+    - FastFood App:
+        icon: mdi-hamburger
+        href: https://fastfood.yourdomain.com
+        description: Demo Food Delivery App
+        ping: http://fastfood-pod:3000

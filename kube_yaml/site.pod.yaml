@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: main-pod # This name is used by global-caddy
+  labels:
+    app: main
+    io.containers.autoupdate: "image" # Optional
+spec:
+  automountServiceAccountToken: false
+  containers:
+  - name: backend
+    image: localhost/main-backend:1.0.0 # Ensure this image is available
+    ports:
+    - name: backend-http
+      containerPort: 3000
+    env:
+    - name: NODE_ENV
+      value: "production"
+    - name: CORS_ORIGIN
+      value: "https://simonemiglio.eu" # This is correct for the public-facing URL
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+      limits:
+        memory: "128Mi"
+
+  - name: main-caddy # Kept 'caddy' in your original, you can rename for clarity if you wish
+    image: docker.io/library/caddy:2-alpine
+    ports:
+    - name: internal-http # Port exposed by this Caddy to the pod/services_net network
+      containerPort: 8080 # << Use this port for internal Caddy
+    volumeMounts:
+    - name: frontend-dist
+      mountPath: /usr/share/caddy
+    - name: caddy-config
+      mountPath: /etc/caddy
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "64Mi"
+      limits:
+        memory: "128Mi"
+
+  volumes:
+  - name: frontend-dist
+    hostPath:
+      path: /home/osvaldo/podman/data/site/frontend_dist # Absolute path
+      type: DirectoryOrCreate
+  - name: caddy-config
+    hostPath:
+      path: /home/osvaldo/podman/data/site/caddy_config # Absolute path
+      type: DirectoryOrCreate

@@ -1,0 +1,184 @@
+# ~/podman/kube_yaml/firefly.pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: firefly-pod
+  labels:
+    app: firefly
+    io.containers.autoupdate: "image"
+spec:
+  automountServiceAccountToken: false
+  
+  containers:
+  # =======================================================
+  # CONTAINER 1: MARIA DB
+  # =======================================================
+  - name: firefly-db
+    image: docker.io/library/mariadb:lts
+    ports:
+    - name: mysql
+      containerPort: 3306
+    env:
+    - name: MYSQL_RANDOM_ROOT_PASSWORD
+      value: "yes"
+    - name: MYSQL_USER
+      valueFrom:
+        secretKeyRef:
+          name: firefly-db-user-k8s
+          key: username
+    - name: MYSQL_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: firefly-db-password-k8s
+          key: password
+    - name: MYSQL_DATABASE
+      valueFrom:
+        secretKeyRef:
+          name: firefly-db-name-k8s
+          key: dbname
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - name: firefly-db-data
+      mountPath: /var/lib/mysql
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        memory: "512Mi"
+
+  # =======================================================
+  # CONTAINER 2: FIREFLY APP (Entrypoint originale)
+  # =======================================================
+  - name: firefly-app
+    image: docker.io/fireflyiii/core:latest
+    securityContext:
+      runAsUser: 0
+    ports:
+    - name: http
+      containerPort: 8080
+    env:
+    - name: APP_ENV
+      value: "production"
+    - name: APP_DEBUG
+      value: "false"
+    - name: SITE_OWNER
+      value: "simone.miglio@proton.me"
+    - name: APP_KEY
+      valueFrom:
+        secretKeyRef:
+          name: firefly-app-key-k8s
+          key: appkey
+    - name: DEFAULT_LANGUAGE
+      value: "it_IT"
+    - name: DEFAULT_LOCALE
+      value: "equal"
+    - name: TZ
+      value: "Europe/Rome"
+    - name: TRUSTED_PROXIES
+      value: "**"
+    - name: LOG_CHANNEL
+      value: "stack"
+    - name: APP_LOG_LEVEL
+      value: "notice"
+    - name: AUDIT_LOG_LEVEL
+      value: "emergency"
+    - name: DB_CONNECTION
+      value: "mysql"
+    - name: DB_HOST
+      value: "127.0.0.1"
+    - name: DB_PORT
+      value: "3306"
+    - name: DB_DATABASE
+      valueFrom:
+        secretKeyRef:
+          name: firefly-db-name-k8s
+          key: dbname
+    - name: DB_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: firefly-db-user-k8s
+          key: username
+    - name: DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: firefly-db-password-k8s
+          key: password
+    - name: CACHE_DRIVER
+      value: "file"
+    - name: SESSION_DRIVER
+      value: "file"
+    - name: COOKIE_PATH
+      value: "/"
+    - name: COOKIE_SECURE
+      value: "false"
+    - name: COOKIE_SAMESITE
+      value: "lax"
+    - name: MAIL_MAILER
+      value: "log"
+    - name: APP_URL
+      value: "https://finanza.simonemiglio.eu"
+    - name: STATIC_CRON_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: firefly-cron-token-k8s
+          key: crontoken
+    volumeMounts:
+    - name: firefly-storage-data
+      mountPath: /var/www/html/storage
+    - name: firefly-bootstrap-cache
+      mountPath: /var/www/html/bootstrap/cache
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        memory: "1Gi"
+
+  # =======================================================
+  # CONTAINER 3: FIREFLY CRON
+  # =======================================================
+  - name: firefly-cron
+    image: docker.io/library/alpine:latest
+    env:
+    - name: TZ
+      value: "Europe/Rome"
+    - name: STATIC_CRON_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: firefly-cron-token-k8s
+          key: crontoken
+    command:
+    - sh
+    - -c
+    - |
+      apk add tzdata wget && \
+      (ln -fs /usr/share/zoneinfo/$TZ /etc/localtime || true) && \
+      echo "0 3 * * * wget -qO- http://127.0.0.1:8080/api/v1/cron/$STATIC_CRON_TOKEN;echo" | crontab - && \
+      crond -f -L /dev/stdout
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "32Mi"
+      limits:
+        memory: "64Mi"
+
+  # =======================================================
+  # VOLUMI
+  # =======================================================
+  volumes:
+  - name: firefly-db-data
+    hostPath:
+      path: /home/osvaldo/podman/data/firefly/db
+      type: DirectoryOrCreate
+  - name: firefly-storage-data
+    hostPath:
+      path: /home/osvaldo/podman/data/firefly/storage
+      type: DirectoryOrCreate
+  - name: firefly-bootstrap-cache
+    hostPath:
+      path: /home/osvaldo/podman/data/firefly/bootstrap-cache
+      type: DirectoryOrCreate
+
+

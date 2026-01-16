@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: uptime-kuma-pod
+spec:
+  containers:
+  - name: uptime-kuma
+    image: docker.io/louislam/uptime-kuma:beta
+    ports:
+    - containerPort: 3001
+      hostPort: 3001
+    volumeMounts:
+    - name: uptime-kuma-data
+      mountPath: /app/data
+    resources:
+      limits:
+        memory: 512Mi
+        cpu: 200m
+      requests:
+        memory: 128Mi
+        cpu: 50m
+  volumes:
+  - name: uptime-kuma-data
+    hostPath:
+      path: /home/osvaldo/podman/data/uptime-kuma
+      type: Directory
+  restartPolicy: Always

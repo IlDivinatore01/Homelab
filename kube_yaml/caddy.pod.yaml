@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: caddy-pod
+  labels:
+    app: caddy
+    # For Podman auto-update (if desired, though re-playing YAML is common)
+    io.containers.autoupdate: "image"
+spec:
+  automountServiceAccountToken: false
+  containers:
+  - name: caddy
+    image: docker.io/library/caddy:latest # Or a specific version like caddy:2.8
+    ports:
+    - name: http
+      containerPort: 80
+      hostPort: 80         # Expose on host
+    - name: https
+      containerPort: 443
+      hostPort: 443        # Expose on host
+    - name: https-udp      # For HTTP/3
+      containerPort: 443
+      protocol: UDP
+      hostPort: 443        # Expose on host
+    volumeMounts:
+    - name: caddyfile
+      mountPath: /etc/caddy/Caddyfile
+      # subPath: Caddyfile     # Mounts only the Caddyfile file
+      readOnly: true
+    - name: caddy-data-volume
+      mountPath: /data       # For ACME certs etc.
+    - name: caddy-config-volume # For other Caddy configs/state
+      mountPath: /config
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+        ephemeral-storage: "1Gi"
+      limits:
+        memory: "512Mi"
+        ephemeral-storage: "2Gi"
+  volumes:
+  - name: caddyfile
+    hostPath:
+      path: /home/osvaldo/podman/data/caddy/Caddyfile # Dir containing Caddyfile
+      type: File
+  - name: caddy-data-volume
+    hostPath:
+      path: /home/osvaldo/podman/data/caddy/acme_certs_data
+      type: DirectoryOrCreate
+  - name: caddy-config-volume
+    hostPath:
+      path: /home/osvaldo/podman/data/caddy/config_data
+      type: DirectoryOrCreate

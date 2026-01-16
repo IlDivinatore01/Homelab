@@ -1,0 +1,104 @@
+# ===========================================
+# Caddy Reverse Proxy Configuration
+# ===========================================
+# Copy to data/caddy/Caddyfile and customize
+
+# Global security headers snippet
+(secure_headers) {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
+
+# ===========================================
+# REPLACE yourdomain.com WITH YOUR DOMAIN
+# ===========================================
+
+gallery.yourdomain.com {
+    encode zstd gzip
+    reverse_proxy host.containers.internal:2283 {
+        header_up X-Forwarded-Proto {scheme}
+    }
+    import secure_headers
+}
+
+home.yourdomain.com {
+    reverse_proxy homepage-pod:3000
+    import secure_headers
+}
+
+www.yourdomain.com {
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    redir https://yourdomain.com{uri}
+}
+
+yourdomain.com {
+    reverse_proxy main-pod:8080
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    }
+}
+
+fastfood.yourdomain.com {
+    reverse_proxy fastfood-pod:3000
+    encode zstd gzip
+    import secure_headers
+}
+
+finanza.yourdomain.com {
+    reverse_proxy firefly-pod:8080
+    encode zstd gzip
+    import secure_headers
+}
+
+importer.finanza.yourdomain.com {
+    reverse_proxy firefly-importer-pod:8080
+    encode zstd gzip
+    import secure_headers
+}
+
+status.yourdomain.com {
+    reverse_proxy uptime-kuma-pod:3001 {
+        header_up Upgrade {http.request.header.Upgrade}
+        header_up Connection {http.request.header.Connection}
+        transport http {
+            read_timeout 600s
+            write_timeout 600s
+        }
+    }
+    encode zstd gzip
+    import secure_headers
+}
+
+portainer.yourdomain.com {
+    reverse_proxy https://portainer-pod:9443 {
+        transport http {
+            tls
+            tls_insecure_skip_verify
+        }
+    }
+    import secure_headers
+}
+
+tools.yourdomain.com {
+    reverse_proxy it-tools-pod:80
+    import secure_headers
+}
+
+panel.yourdomain.com {
+    reverse_proxy https://host.containers.internal:9090 {
+        transport http {
+            tls
+            tls_insecure_skip_verify
+        }
+    }
+    import secure_headers
+}

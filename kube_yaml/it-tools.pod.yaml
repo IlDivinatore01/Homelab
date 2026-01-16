@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: it-tools-pod
+  labels:
+    app: it-tools
+    io.containers.autoupdate: registry
+spec:
+  containers:
+    - name: it-tools
+      image: docker.io/corentinth/it-tools:latest
+      resources:
+        limits:
+          memory: 256Mi
+          cpu: 500m

@@ -1,0 +1,68 @@
+# ===========================================
+# Homelab Infrastructure - Git Ignore
+# ===========================================
+# This file ensures NO SECRETS are committed!
+
+# ===========================================
+# DATA DIRECTORIES (contain secrets & user data)
+# ===========================================
+data/
+backups/
+
+# ===========================================
+# PROJECT SUBFOLDERS (separate repos)
+# ===========================================
+FastFood/
+simonemiglio-website/
+
+# ===========================================
+# SECRETS & ENVIRONMENT FILES
+# ===========================================
+*.secret
+*.key
+*.pem
+.env
+.env.*
+!.env.example
+secrets/
+
+# ===========================================
+# SENSITIVE CONFIGS
+# ===========================================
+# These are in config_examples/ as templates instead
+rclone.conf
+
+# ===========================================
+# RUNTIME & CACHE
+# ===========================================
+*.log
+*.pid
+.cache/
+__pycache__/
+
+# ===========================================
+# IDE & OS
+# ===========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ===========================================
+# TEMPORARY FILES
+# ===========================================
+*.tmp
+*.temp
+*.bak
+
+# ===========================================
+# ADDITIONAL EXCLUSIONS
+# ===========================================
+podman_secrets/
+create_firefly_secrets.sh
+*.secret.yaml
+
+kube_yaml/appflowy.pod.yaml
+site_sources/
