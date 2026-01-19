@@ -147,9 +147,12 @@ podman/
 │
 ├── scripts/                 # Utility scripts
 │   ├── create_secrets.sh    # Interactive secrets setup
+│   ├── nightly_backup.sh    # Automated nightly backups (cron)
 │   ├── setup_permission_fix.sh
 │   ├── setup_fail2ban.sh
 │   └── setup_cockpit.sh
+│
+├── logs/                    # Backup logs (auto-created)
 │
 ├── docs/                    # Additional documentation
 │   └── ARCHITETTURA.md      # Architecture (Italian)
@@ -178,13 +181,28 @@ podman/
 
 Options:
 1. Start/Restart Services
-2. Update Services
+2. Update Services (with Pull & Backup)
 3. Stop Services
-4. Backup Immich
-5. Backup Firefly
-6. Backup System Tools
+4. Backup Immich (DB dump → cloud sync)
+5. Backup Firefly (DB + data → cloud sync)
+6. Backup System Tools (Kuma/Portainer)
 7. List Backups
 8. Full System Cleanup
+9. Setup & Verify Quadlet Config
+10. Restart Caddy Proxy
+11. Optimize Databases
+
+### Automated Backups
+
+Nightly backups run automatically at **3:00 AM** via cron:
+
+```bash
+# Check nightly backup logs
+cat ~/podman/logs/nightly_backup_$(date +%Y-%m-%d).log
+
+# View cron jobs
+crontab -l
+```
 
 ### Direct Commands
 

@@ -23,5 +23,5 @@ spec:
   - name: uptime-kuma-data
     hostPath:
       path: /home/osvaldo/podman/data/uptime-kuma
-      type: Directory
+      type: DirectoryOrCreate
   restartPolicy: Always

@@ -236,22 +236,26 @@ sync_to_cloud() {
     mkdir -p "$OFFSITE_BACKUP_DIR" || { warn "Could not create offsite dir $OFFSITE_BACKUP_DIR"; return; }
   fi
 
-  info "Syncing backup to Cloud ($OFFSITE_BACKUP_DIR)..."
-  cp -r "$backup_path" "$OFFSITE_BACKUP_DIR/"
-
-  local backup_pattern="${service_name}_backup_"
-  local count
-  count="$(find "$OFFSITE_BACKUP_DIR" -maxdepth 1 -name "${backup_pattern}*" -type d | wc -l)"
-
-  if [ "$count" -gt "$OFFSITE_LIMIT" ]; then
-    info "Rotating Offsite Backups (Found: $count, Keep: $OFFSITE_LIMIT)..."
-    find "$OFFSITE_BACKUP_DIR" -maxdepth 1 -name "${backup_pattern}*" -type d -printf '%T@ %p\n' | \
-      sort -n | \
-      head -n -"$OFFSITE_LIMIT" | \
-      cut -d' ' -f2- | \
-      xargs -r rm -rf
-    success "Old offsite backups cleaned."
-  fi
+  local log_file="/tmp/cloud_sync_${service_name}_$(date +%Y%m%d_%H%M%S).log"
+  info "Starting background cloud sync to $OFFSITE_BACKUP_DIR..."
+  info "Progress log: $log_file"
+  
+  # Run rsync in background with nohup
+  nohup bash -c "
+    rsync -a --info=progress2 '$backup_path' '$OFFSITE_BACKUP_DIR/' >> '$log_file' 2>&1
+    
+    # Rotate old offsite backups after sync completes
+    backup_pattern='${service_name}_backup_'
+    count=\$(find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d | wc -l)
+    if [ \"\$count\" -gt $OFFSITE_LIMIT ]; then
+      echo 'Rotating old offsite backups...' >> '$log_file'
+      find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d -printf '%T@ %p\n' | \
+        sort -n | head -n -$OFFSITE_LIMIT | cut -d' ' -f2- | xargs -r rm -rf
+    fi
+    echo 'Cloud sync complete!' >> '$log_file'
+  " &>/dev/null &
+  
+  success "Cloud sync started in background (PID: $!)"
 }
 
 backup_immich() {
@@ -313,9 +317,17 @@ backup_immich() {
     return 1
   fi
 
-  info "Backing up Data Files..."
-  rsync -a --info=progress2 "$IMMICH_DATA_DIR/" "$backup_dir/data/" && \
-    success "Immich backup complete!"
+  # Backup ML cache if it exists (photos are on external storage, not backed up here)
+  local IMMICH_ML_CACHE="$PODMAN_SETUP_DIR/data/immich/immich_model_cache"
+  if [ -d "$IMMICH_ML_CACHE" ]; then
+    info "Backing up ML Model Cache..."
+    rsync -a --info=progress2 "$IMMICH_ML_CACHE/" "$backup_dir/ml_cache/" && \
+      success "ML cache backed up."
+  else
+    info "Skipping ML cache backup (directory doesn't exist)."
+  fi
+  
+  success "Immich backup complete! (DB dump saved, photos on external storage)"
     
   sync_to_cloud "immich" "$backup_dir"
 }
@@ -360,8 +372,8 @@ backup_firefly() {
     return 1
   fi
 
-  info "Backing up Data Files..."
-  rsync -a --info=progress2 "$FIREFLY_DATA_DIR/" "$backup_dir/data/" && \
+  info "Backing up Data Files (excluding db - already dumped via SQL)..."
+  rsync -a --info=progress2 --exclude='db/' --exclude='storage/oauth-*.key' "$FIREFLY_DATA_DIR/" "$backup_dir/data/" && \
     success "Firefly III backup complete!"
     
   sync_to_cloud "firefly" "$backup_dir"
