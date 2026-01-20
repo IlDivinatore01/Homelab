@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: garage-pod
+  labels:
+    app: garage
+    io.containers.autoupdate: "registry"
+spec:
+  containers:
+  # Garage S3 Server
+  - name: garage
+    image: docker.io/dxflrs/garage:v2.1.0
+    ports:
+    - containerPort: 3900
+      hostPort: 3900
+      name: s3-api
+    - containerPort: 3901
+      hostPort: 3901
+      name: rpc
+    - containerPort: 3903
+      hostPort: 3903
+      name: admin
+    volumeMounts:
+    - name: garage-config
+      mountPath: /etc/garage.toml
+      subPath: garage.toml
+    - name: garage-meta
+      mountPath: /var/lib/garage/meta
+    - name: garage-data
+      mountPath: /var/lib/garage/data
+    resources:
+      limits:
+        memory: 512Mi
+        cpu: 500m
+      requests:
+        memory: 128Mi
+        cpu: 100m
+  
+  # Garage WebUI
+  - name: webui
+    image: docker.io/khairul169/garage-webui:latest
+    ports:
+    - containerPort: 3909
+      hostPort: 3909
+      name: webui
+    volumeMounts:
+    - name: garage-config
+      mountPath: /etc/garage.toml
+      subPath: garage.toml
+    env:
+    - name: API_BASE_URL
+      value: "http://127.0.0.1:3903"
+    - name: S3_ENDPOINT_URL
+      value: "http://127.0.0.1:3900"
+    - name: AUTH_USER_PASS
+      value: "YOUR_BCRYPT_HASH_HERE"
+    resources:
+      limits:
+        memory: 256Mi
+        cpu: 200m
+      requests:
+        memory: 64Mi
+        cpu: 50m
+
+  volumes:
+  - name: garage-config
+    hostPath:
+      path: /home/osvaldo/podman/data/garage
+      type: Directory
+  - name: garage-meta
+    hostPath:
+      path: /home/osvaldo/podman/data/garage/meta
+      type: DirectoryOrCreate
+  - name: garage-data
+    hostPath:
+      path: /mnt/immich_storage/garage
+      type: DirectoryOrCreate
+  restartPolicy: Always

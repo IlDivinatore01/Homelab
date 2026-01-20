@@ -36,6 +36,8 @@ Self-hosted infrastructure running on Podman with Systemd Quadlet integration.
 | **IT-Tools** | tools.simonemiglio.eu | Developer utilities |
 | **Portainer** | portainer.simonemiglio.eu | Container UI |
 | **Cockpit** | panel.simonemiglio.eu | System admin |
+| **Garage S3** | s3.simonemiglio.eu | S3-compatible storage |
+| **Garage WebUI** | garage.simonemiglio.eu | S3 admin interface |
 
 ---
 
@@ -139,10 +141,12 @@ podman/
 │   ├── fastfood.pod.yaml
 │   ├── uptime-kuma.pod.yaml
 │   ├── portainer.pod.yaml
+│   ├── garage.pod.yaml      # Gitignored (contains auth hash)
 │   └── it-tools.pod.yaml
 │
 ├── config_examples/         # Configuration templates
 │   ├── Caddyfile.example
+│   ├── garage.pod.yaml.example
 │   └── services.yaml.example
 │
 ├── scripts/                 # Utility scripts

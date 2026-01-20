@@ -137,6 +137,8 @@ Add these A records pointing to your server IP:
 | `tools` | A | `YOUR_SERVER_IP` |
 | `panel` | A | `YOUR_SERVER_IP` |
 | `portainer` | A | `YOUR_SERVER_IP` |
+| `s3` | A | `YOUR_SERVER_IP` |
+| `garage` | A | `YOUR_SERVER_IP` |
 
 ---
 
@@ -208,6 +210,54 @@ crontab -e
 # Add daily backup at 3 AM:
 0 3 * * * /home/osvaldo/podman/manage_finale.sh backup-all
 ```
+
+---
+
+## 🗄️ Step 8b: Configure Garage S3 (Optional)
+
+Garage provides S3-compatible storage using your Hetzner Storage Box.
+
+### 8b.1 Setup Garage
+
+```bash
+# Copy example config
+cp config_examples/garage.pod.yaml.example kube_yaml/garage.pod.yaml
+
+# Generate WebUI authentication hash
+sudo apt install -y apache2-utils
+htpasswd -nbBC 10 "admin" "YOUR_PASSWORD"
+
+# Edit garage.pod.yaml and replace AUTH_USER_PASS value with the generated hash
+nano kube_yaml/garage.pod.yaml
+```
+
+### 8b.2 Start Garage
+
+```bash
+systemctl --user daemon-reload
+systemctl --user start garage.service
+```
+
+### 8b.3 Initialize Cluster
+
+```bash
+# Get node ID
+podman exec garage-pod-garage /garage status
+
+# Assign layout (replace NODE_ID)
+podman exec garage-pod-garage /garage layout assign -z dc1 -c 1T NODE_ID
+podman exec garage-pod-garage /garage layout apply --version 1
+
+# Create buckets
+podman exec garage-pod-garage /garage bucket create backups
+podman exec garage-pod-garage /garage key create backup-key
+podman exec garage-pod-garage /garage bucket allow --read --write --owner backups --key backup-key
+```
+
+### 8b.4 Access
+
+- **S3 API**: https://s3.yourdomain.com
+- **WebUI**: https://garage.yourdomain.com
 
 ---
 

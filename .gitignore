@@ -66,4 +66,5 @@ create_firefly_secrets.sh
 *.secret.yaml
 
 kube_yaml/appflowy.pod.yaml
+kube_yaml/garage.pod.yaml
 site_sources/
