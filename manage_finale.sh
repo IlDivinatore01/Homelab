@@ -22,6 +22,14 @@ MAX_BACKUPS_PER_SERVICE=1
 OFFSITE_BACKUP_DIR="/mnt/immich_storage/Full_VPS_Backups"
 OFFSITE_LIMIT=5
 
+# S3 Backup Configuration (Garage)
+S3_ENDPOINT="http://localhost:3900"
+S3_BUCKET="backups"
+S3_REGION="garage"
+S3_ACCESS_KEY="GK6a9e75d2eb754591df2c9233"
+S3_SECRET_KEY="102002dace2a347d3301144558c46a4ce2bdeb2cea751c01b320b32ab715be31"
+USE_S3_BACKUP=true  # Set to false to use old rsync method
+
 declare -A PODS=(
   [homepage]="$PODMAN_SETUP_DIR/kube_yaml/homepage.pod.yaml"
   [site]="$PODMAN_SETUP_DIR/kube_yaml/site.pod.yaml"
@@ -231,31 +239,85 @@ rotate_backups() {
 sync_to_cloud() {
   local service_name="$1"
   local backup_path="$2"
-
-  if [ ! -d "$OFFSITE_BACKUP_DIR" ]; then
-    mkdir -p "$OFFSITE_BACKUP_DIR" || { warn "Could not create offsite dir $OFFSITE_BACKUP_DIR"; return; }
-  fi
-
   local log_file="/tmp/cloud_sync_${service_name}_$(date +%Y%m%d_%H%M%S).log"
-  info "Starting background cloud sync to $OFFSITE_BACKUP_DIR..."
-  info "Progress log: $log_file"
-  
-  # Run rsync in background with nohup
-  nohup bash -c "
-    rsync -a --info=progress2 '$backup_path' '$OFFSITE_BACKUP_DIR/' >> '$log_file' 2>&1
+
+  if [ "$USE_S3_BACKUP" = true ]; then
+    # Use S3 (Garage) for backup
+    info "Starting S3 upload to s3://$S3_BUCKET/..."
+    info "Progress log: $log_file"
     
-    # Rotate old offsite backups after sync completes
-    backup_pattern='${service_name}_backup_'
-    count=\$(find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d | wc -l)
-    if [ \"\$count\" -gt $OFFSITE_LIMIT ]; then
-      echo 'Rotating old offsite backups...' >> '$log_file'
-      find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d -printf '%T@ %p\n' | \
-        sort -n | head -n -$OFFSITE_LIMIT | cut -d' ' -f2- | xargs -r rm -rf
+    # Create tar.gz of backup directory for efficient upload
+    local backup_name=$(basename "$backup_path")
+    local tar_file="/tmp/${backup_name}.tar.gz"
+    
+    nohup bash -c "
+      echo 'Creating compressed archive...' >> '$log_file'
+      tar -czf '$tar_file' -C '$(dirname "$backup_path")' '$backup_name' 2>> '$log_file'
+      
+      echo 'Uploading to S3...' >> '$log_file'
+      
+      # Use ephemeral container for AWS CLI
+      podman run --rm --net=host \
+        -v '$tar_file':'/backup.tar.gz':ro \
+        -e AWS_ACCESS_KEY_ID='$S3_ACCESS_KEY' \
+        -e AWS_SECRET_ACCESS_KEY='$S3_SECRET_KEY' \
+        docker.io/amazon/aws-cli:latest \
+        --region '$S3_REGION' \
+        --endpoint-url '$S3_ENDPOINT' s3 cp /backup.tar.gz 's3://$S3_BUCKET/${backup_name}.tar.gz' >> '$log_file' 2>&1
+      
+      # Cleanup temp file
+      rm -f '$tar_file'
+      
+      # List and rotate old backups (keep last $OFFSITE_LIMIT)
+      echo 'Checking for old backups to rotate...' >> '$log_file'
+      
+      # Get list of old backups
+      podman run --rm --net=host \
+        -e AWS_ACCESS_KEY_ID='$S3_ACCESS_KEY' \
+        -e AWS_SECRET_ACCESS_KEY='$S3_SECRET_KEY' \
+        docker.io/amazon/aws-cli:latest \
+        --region '$S3_REGION' \
+        --endpoint-url '$S3_ENDPOINT' s3 ls 's3://$S3_BUCKET/${service_name}_backup_' 2>/dev/null | \
+        sort | head -n -$OFFSITE_LIMIT | awk '{print \$4}' | while read old_backup; do
+          echo \"Deleting old backup: \$old_backup\" >> '$log_file'
+          
+          podman run --rm --net=host \
+            -e AWS_ACCESS_KEY_ID='$S3_ACCESS_KEY' \
+            -e AWS_SECRET_ACCESS_KEY='$S3_SECRET_KEY' \
+            docker.io/amazon/aws-cli:latest \
+            --region '$S3_REGION' \
+            --endpoint-url '$S3_ENDPOINT' s3 rm \"s3://$S3_BUCKET/\$old_backup\" >> '$log_file' 2>&1
+        done
+      
+      echo 'S3 upload complete!' >> '$log_file'
+    " &>/dev/null &
+    
+    success "S3 upload started in background (PID: $!)"
+  else
+    # Use old rsync method
+    if [ ! -d "$OFFSITE_BACKUP_DIR" ]; then
+      mkdir -p "$OFFSITE_BACKUP_DIR" || { warn "Could not create offsite dir $OFFSITE_BACKUP_DIR"; return; }
     fi
-    echo 'Cloud sync complete!' >> '$log_file'
-  " &>/dev/null &
-  
-  success "Cloud sync started in background (PID: $!)"
+
+    info "Starting background rsync to $OFFSITE_BACKUP_DIR..."
+    info "Progress log: $log_file"
+    
+    nohup bash -c "
+      rsync -a --info=progress2 '$backup_path' '$OFFSITE_BACKUP_DIR/' >> '$log_file' 2>&1
+      
+      # Rotate old offsite backups after sync completes
+      backup_pattern='${service_name}_backup_'
+      count=\$(find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d | wc -l)
+      if [ \"\$count\" -gt $OFFSITE_LIMIT ]; then
+        echo 'Rotating old offsite backups...' >> '$log_file'
+        find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d -printf '%T@ %p\n' | \
+          sort -n | head -n -$OFFSITE_LIMIT | cut -d' ' -f2- | xargs -r rm -rf
+      fi
+      echo 'Cloud sync complete!' >> '$log_file'
+    " &>/dev/null &
+    
+    success "Rsync started in background (PID: $!)"
+  fi
 }
 
 backup_immich() {
@@ -579,6 +641,88 @@ optimize_databases() {
   fi
 }
 
+download_from_s3() {
+  if [ "$USE_S3_BACKUP" != true ]; then
+    warn "S3 Backup is not enabled in configuration."
+    read -p "Press Enter to continue..."
+    return
+  fi
+
+  title "DOWNLOAD FROM S3"
+  
+  info "Fetching backup list from S3..."
+  
+  # Fetch list using podman
+  available_backups=$(podman run --rm --net=host \
+    -e AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" \
+    -e AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" \
+    docker.io/amazon/aws-cli:latest \
+    --region "$S3_REGION" \
+    --endpoint-url "$S3_ENDPOINT" s3 ls "s3://$S3_BUCKET/" 2>/dev/null | awk '{print $4}' | sort -r)
+    
+  if [ -z "$available_backups" ]; then
+    warn "No backups found in S3 bucket."
+    read -p "Press Enter to continue..."
+    return
+  fi
+
+  echo "Available Backups:"
+  echo "------------------"
+  local i=1
+  declare -A backup_map
+  while read -r line; do
+    if [ -n "$line" ]; then
+      echo " $i) $line"
+      backup_map[$i]="$line"
+      ((i++))
+    fi
+  done <<< "$available_backups"
+  echo " 0) Cancel"
+  echo "------------------"
+  
+  read -p "Select backup to download: " -r selection
+  
+  if [ "$selection" == "0" ] || [ -z "${backup_map[$selection]}" ]; then
+    info "Operation cancelled."
+    return
+  fi
+  
+  local target_file="${backup_map[$selection]}"
+  local download_path="$BACKUP_BASE_DIR/$target_file"
+  
+  info "Downloading $target_file..."
+  
+  podman run --rm --net=host \
+    -v "$BACKUP_BASE_DIR":/downloads \
+    -e AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY" \
+    -e AWS_SECRET_ACCESS_KEY="$S3_SECRET_KEY" \
+    docker.io/amazon/aws-cli:latest \
+    --region "$S3_REGION" \
+    --endpoint-url "$S3_ENDPOINT" s3 cp "s3://$S3_BUCKET/$target_file" "/downloads/$target_file"
+    
+  if [ $? -eq 0 ]; then
+    success "Download complete: $download_path"
+    
+    read -p "Do you want to extract it now? (y/N): " -r extract_reply
+    if [[ "$extract_reply" =~ ^[Yy]$ ]]; then
+      info "Extracting..."
+      tar -xzf "$download_path" -C "$BACKUP_BASE_DIR"
+      success "Extracted to $BACKUP_BASE_DIR"
+      
+      # Optional: remove tar.gz after extraction
+      read -p "Remove archive file? (y/N): " -r remove_reply
+      if [[ "$remove_reply" =~ ^[Yy]$ ]]; then
+        rm -f "$download_path"
+        success "Archive removed."
+      fi
+    fi
+  else
+    error "Download failed."
+  fi
+  
+  read -p "Press Enter to continue..."
+}
+
 cleanup_all() {
   ensure_shared_network
   title "SYSTEM CLEANUP"
@@ -621,7 +765,7 @@ select_services() {
 
 main_menu() {
   while true; do
-    echo ""; title "PODMAN SERVICE MANAGER (Quadlet Edition v2.7)"; echo ""
+    echo ""; title "PODMAN SERVICE MANAGER (Quadlet Edition v2.8)"; echo ""
     echo " 1) Start/Restart Services"
     echo " 2) Update Services (with Pull & Backup)"
     echo " 3) Stop Services"
@@ -629,13 +773,14 @@ main_menu() {
     echo " 4) Backup Immich"
     echo " 5) Backup Firefly III"
     echo " 6) Backup System Tools (Kuma/Portainer)"
-
+    
     echo " 7) List Backups"
+    echo " 8) Restore / Download from S3"
     echo "----------------------------"
-    echo " 8) Full System Cleanup"
-    echo " 9) Setup & Verify Quadlet Config"
-    echo " 10) Restart Caddy Proxy"
-    echo " 11) Optimize Databases"
+    echo " 9) Full System Cleanup"
+    echo " 10) Setup & Verify Quadlet Config"
+    echo " 11) Restart Caddy Proxy"
+    echo " 12) Optimize Databases"
     echo " 0) Exit"
     echo ""
     read -p "Select Option: " opt
@@ -696,10 +841,11 @@ main_menu() {
       6) backup_uptime_kuma; backup_portainer ;;
 
       7) echo ""; ls -lht "$BACKUP_BASE_DIR"/ | head -20 ;;
-      8) cleanup_all ;;
-      9) verify_quadlets ;;
-      10) restart_caddy ;;
-      11) optimize_databases ;;
+      8) download_from_s3 ;;
+      9) cleanup_all ;;
+      10) verify_quadlets ;;
+      11) restart_caddy ;;
+      12) optimize_databases ;;
       0) exit 0 ;;
       *) error "Invalid option." ;;
     esac
