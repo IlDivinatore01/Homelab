@@ -39,11 +39,12 @@ declare -A PODS=(
   [uptime-kuma]="$PODMAN_SETUP_DIR/kube_yaml/uptime-kuma.pod.yaml"
   [portainer]="$PODMAN_SETUP_DIR/kube_yaml/portainer.pod.yaml"
   [it-tools]="$PODMAN_SETUP_DIR/kube_yaml/it-tools.pod.yaml"
+  [garage]="$PODMAN_SETUP_DIR/kube_yaml/garage.pod.yaml"
 
 
   [fastfood]="$PODMAN_SETUP_DIR/kube_yaml/fastfood.pod.yaml"
 )
-SERVICES=(homepage site immich firefly firefly-importer uptime-kuma portainer fastfood it-tools)
+SERVICES=(homepage site immich firefly firefly-importer uptime-kuma portainer fastfood it-tools garage)
 
 # --- LOGGING UTILS ---
 C_RESET='\033[0m'
