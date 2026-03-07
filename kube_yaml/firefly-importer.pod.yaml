@@ -12,8 +12,8 @@ spec:
   - name: init-storage
     image: docker.io/fireflyiii/data-importer:latest
     securityContext:
-      runAsUser: 33  # <-- Esegui come www-data
-      runAsGroup: 33
+      runAsUser: 0  # Run as root to create directories
+      runAsGroup: 0
     command:
       - sh
       - -c

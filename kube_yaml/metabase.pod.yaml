@@ -1,0 +1,49 @@
+# ~/podman/kube_yaml/metabase.pod.yaml
+# Metabase Analytics Dashboard
+apiVersion: v1
+kind: Pod
+metadata:
+  name: metabase-pod
+  labels:
+    app: metabase
+    io.containers.autoupdate: "registry"
+spec:
+  automountServiceAccountToken: false
+  
+  containers:
+  - name: metabase
+    image: docker.io/metabase/metabase:latest
+    ports:
+    - name: http
+      containerPort: 3000
+    env:
+    - name: MB_SITE_NAME
+      value: "Simone Analytics"
+    - name: MB_SITE_URL
+      value: "https://analytics.simonemiglio.eu"
+    - name: MB_SITE_LOCALE
+      value: "it"
+    - name: MB_DB_TYPE
+      value: "h2"
+    # Metabase internal DB stored in volume
+    - name: MB_DB_FILE
+      value: "/metabase-data/metabase.db"
+    - name: JAVA_TIMEZONE
+      value: "Europe/Rome"
+    - name: MB_EMOJI_IN_LOGS
+      value: "false"
+    volumeMounts:
+    - name: metabase-data
+      mountPath: /metabase-data
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        memory: "1Gi"
+  
+  volumes:
+  - name: metabase-data
+    hostPath:
+      path: /home/osvaldo/podman/data/metabase
+      type: DirectoryOrCreate

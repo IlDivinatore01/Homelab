@@ -1,5 +1,5 @@
 # 📘 SERVER ARCHITECTURE WIKI
-**Data di aggiornamento:** Gennaio 2026
+**Data di aggiornamento:** Febbraio 2026
 **Autore:** Osvaldo & Gemini
 
 Questo documento spiega l'architettura **"Self-Healing"** (auto-riparante) del server.
@@ -52,7 +52,7 @@ Vedere i dettagli di una singola applicazione (es. Caddy o Immich):
 ```bash
 systemctl --user status caddy
 ```
-*(Sostituisci `caddy` con il nome del servizio che ti interessa, es. `immich`, `firefly`, etc.)*
+*(Sostituisci `caddy` con il nome del servizio che ti interessa, es. `immich`, `firefly`, `metabase`, etc.)*
 
 ### 📜 Leggere i LOG in tempo reale
 Se un sito non carica o dà errore, questo comando mostra i log in diretta (come un tail):
@@ -108,6 +108,7 @@ Ecco dove si trovano i pezzi fondamentali del tuo server:
 * **`~/podman/data/`**
   💾 **I Dati Persistenti**
   Dove risiedono fisicamente i file dei tuoi siti, i database e le foto.
+  Include anche i dati di Metabase (database H2 per dashboard e query salvate).
 
 * **`~/podman/backups/`**
   📦 **I Backup**

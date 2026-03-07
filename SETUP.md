@@ -86,7 +86,7 @@ You'll need to provide:
 ### 4.1 Create Data Directories
 
 ```bash
-mkdir -p data/{caddy,homepage/config,immich,firefly,uptime-kuma,portainer,fastfood,it-tools}
+mkdir -p data/{caddy,homepage/config,immich,firefly,metabase,actual,uptime-kuma,portainer,fastfood,it-tools}
 mkdir -p backups
 ```
 
@@ -100,7 +100,27 @@ cp config_examples/Caddyfile.example data/caddy/Caddyfile
 cp config_examples/services.yaml.example data/homepage/config/services.yaml
 ```
 
-### 4.3 Edit Configs
+### 4.3 Create Homepage Secrets (for Immich widget)
+
+```bash
+# Create the secret file
+cat > podman_secrets/homepage_immich_key.secret.yaml << 'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: homepage-immich-key-k8s
+type: Opaque
+stringData:
+  apikey: YOUR_IMMICH_API_KEY
+EOF
+
+# Apply the secret
+podman kube play podman_secrets/homepage_immich_key.secret.yaml
+```
+
+> **Note:** Get the Immich API key from Immich → User Settings → API Keys after first run.
+
+### 4.4 Edit Configs
 
 Replace `yourdomain.com` with your actual domain in:
 
@@ -115,7 +135,6 @@ nano data/homepage/config/services.yaml
 **Find and replace:**
 ```
 yourdomain.com → your-actual-domain.com
-YOUR_IMMICH_API_KEY → (get from Immich settings after first run)
 ```
 
 ---
@@ -137,6 +156,7 @@ Add these A records pointing to your server IP:
 | `tools` | A | `YOUR_SERVER_IP` |
 | `panel` | A | `YOUR_SERVER_IP` |
 | `portainer` | A | `YOUR_SERVER_IP` |
+| `analytics` | A | `YOUR_SERVER_IP` |
 | `s3` | A | `YOUR_SERVER_IP` |
 | `garage` | A | `YOUR_SERVER_IP` |
 

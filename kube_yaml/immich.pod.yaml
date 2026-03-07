@@ -65,6 +65,10 @@ spec:
   - name: immich-machine-learning
     image: ghcr.io/immich-app/immich-machine-learning:release
     env:
+    - name: MACHINE_LEARNING_WORKERS
+      value: "1"
+    - name: MACHINE_LEARNING_WORKER_TIMEOUT
+      value: "120"
     - name: DB_HOSTNAME
       value: "127.0.0.1"
     - name: REDIS_HOSTNAME

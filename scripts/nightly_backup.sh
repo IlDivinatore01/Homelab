@@ -39,6 +39,17 @@ else
     log "ERROR: Firefly backup failed"
 fi
 
+# Small delay between backups
+sleep 5
+
+# Backup Metabase
+log "Starting Metabase backup..."
+if ./manage_finale.sh <<< "6" >> "$LOG_FILE" 2>&1; then
+    log "Metabase backup completed successfully"
+else
+    log "ERROR: Metabase backup failed"
+fi
+
 log "=== NIGHTLY BACKUP FINISHED ==="
 
 # Cleanup old logs (keep last 7 days)

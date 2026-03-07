@@ -36,6 +36,7 @@ declare -A PODS=(
   [immich]="$PODMAN_SETUP_DIR/kube_yaml/immich.pod.yaml"
   [firefly]="$PODMAN_SETUP_DIR/kube_yaml/firefly.pod.yaml"
   [firefly-importer]="$PODMAN_SETUP_DIR/kube_yaml/firefly-importer.pod.yaml"
+  [metabase]="$PODMAN_SETUP_DIR/kube_yaml/metabase.pod.yaml"
   [uptime-kuma]="$PODMAN_SETUP_DIR/kube_yaml/uptime-kuma.pod.yaml"
   [portainer]="$PODMAN_SETUP_DIR/kube_yaml/portainer.pod.yaml"
   [it-tools]="$PODMAN_SETUP_DIR/kube_yaml/it-tools.pod.yaml"
@@ -43,8 +44,9 @@ declare -A PODS=(
 
 
   [fastfood]="$PODMAN_SETUP_DIR/kube_yaml/fastfood.pod.yaml"
+  [actual]="$PODMAN_SETUP_DIR/kube_yaml/actual.pod.yaml"
 )
-SERVICES=(homepage site immich firefly firefly-importer uptime-kuma portainer fastfood it-tools garage)
+SERVICES=(homepage site immich firefly firefly-importer metabase actual uptime-kuma portainer fastfood it-tools garage)
 
 # --- LOGGING UTILS ---
 C_RESET='\033[0m'
@@ -280,14 +282,14 @@ sync_to_cloud() {
         --region '$S3_REGION' \
         --endpoint-url '$S3_ENDPOINT' s3 ls 's3://$S3_BUCKET/${service_name}_backup_' 2>/dev/null | \
         sort | head -n -$OFFSITE_LIMIT | awk '{print \$4}' | while read old_backup; do
-          echo \"Deleting old backup: \$old_backup\" >> '$log_file'
+          echo "Deleting old backup: \$old_backup" >> '$log_file'
           
           podman run --rm --net=host \
             -e AWS_ACCESS_KEY_ID='$S3_ACCESS_KEY' \
             -e AWS_SECRET_ACCESS_KEY='$S3_SECRET_KEY' \
             docker.io/amazon/aws-cli:latest \
             --region '$S3_REGION' \
-            --endpoint-url '$S3_ENDPOINT' s3 rm \"s3://$S3_BUCKET/\$old_backup\" >> '$log_file' 2>&1
+            --endpoint-url '$S3_ENDPOINT' s3 rm "s3://$S3_BUCKET/\$old_backup" >> '$log_file' 2>&1
         done
       
       echo 'S3 upload complete!' >> '$log_file'
@@ -308,10 +310,10 @@ sync_to_cloud() {
       
       # Rotate old offsite backups after sync completes
       backup_pattern='${service_name}_backup_'
-      count=\$(find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d | wc -l)
-      if [ \"\$count\" -gt $OFFSITE_LIMIT ]; then
+      count=\$(find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name "\${backup_pattern}*" -type d | wc -l)
+      if [ "\$count" -gt $OFFSITE_LIMIT ]; then
         echo 'Rotating old offsite backups...' >> '$log_file'
-        find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name \"\${backup_pattern}*\" -type d -printf '%T@ %p\n' | \
+        find '$OFFSITE_BACKUP_DIR' -maxdepth 1 -name "\${backup_pattern}*" -type d -printf '%T@ %p\n' | \
           sort -n | head -n -$OFFSITE_LIMIT | cut -d' ' -f2- | xargs -r rm -rf
       fi
       echo 'Cloud sync complete!' >> '$log_file'
@@ -476,6 +478,25 @@ backup_portainer() {
     success "Portainer backup complete!"
     
   sync_to_cloud "portainer" "$backup_dir"
+}
+
+backup_metabase() {
+  ensure_shared_network
+  check_dependencies
+  local METABASE_DATA_DIR="$PODMAN_SETUP_DIR/data/metabase"
+  local timestamp backup_dir
+  timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
+  backup_dir="$BACKUP_BASE_DIR/metabase_backup_$timestamp"
+
+  title "BACKUP METABASE"
+  rotate_backups "metabase"
+  mkdir -p "$backup_dir"
+  info "Backing up Metabase H2 Database and config..."
+  # Metabase uses H2 embedded DB - just copy the data files
+  rsync -a --info=progress2 "$METABASE_DATA_DIR/" "$backup_dir/data/" && \
+    success "Metabase backup complete!"
+    
+  sync_to_cloud "metabase" "$backup_dir"
 }
 
 # --- BUILD & UPDATES ---
@@ -773,15 +794,16 @@ main_menu() {
     echo "----------------------------"
     echo " 4) Backup Immich"
     echo " 5) Backup Firefly III"
-    echo " 6) Backup System Tools (Kuma/Portainer)"
+    echo " 6) Backup Metabase"
+    echo " 7) Backup System Tools (Kuma/Portainer)"
     
-    echo " 7) List Backups"
-    echo " 8) Restore / Download from S3"
+    echo " 8) List Backups"
+    echo " 9) Restore / Download from S3"
     echo "----------------------------"
-    echo " 9) Full System Cleanup"
-    echo " 10) Setup & Verify Quadlet Config"
-    echo " 11) Restart Caddy Proxy"
-    echo " 12) Optimize Databases"
+    echo " 10) Full System Cleanup"
+    echo " 11) Setup & Verify Quadlet Config"
+    echo " 12) Restart Caddy Proxy"
+    echo " 13) Optimize Databases"
     echo " 0) Exit"
     echo ""
     read -p "Select Option: " opt
@@ -839,14 +861,15 @@ main_menu() {
         ;;
       4) backup_immich ;;
       5) backup_firefly ;;
-      6) backup_uptime_kuma; backup_portainer ;;
+      6) backup_metabase ;;
+      7) backup_uptime_kuma; backup_portainer ;;
 
-      7) echo ""; ls -lht "$BACKUP_BASE_DIR"/ | head -20 ;;
-      8) download_from_s3 ;;
-      9) cleanup_all ;;
-      10) verify_quadlets ;;
-      11) restart_caddy ;;
-      12) optimize_databases ;;
+      8) echo ""; ls -lht "$BACKUP_BASE_DIR"/ | head -20 ;;
+      9) download_from_s3 ;;
+      10) cleanup_all ;;
+      11) verify_quadlets ;;
+      12) restart_caddy ;;
+      13) optimize_databases ;;
       0) exit 0 ;;
       *) error "Invalid option." ;;
     esac

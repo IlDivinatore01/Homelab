@@ -29,8 +29,12 @@ Self-hosted infrastructure running on Podman with Systemd Quadlet integration.
 | Service | Domain | Description |
 |---------|--------|-------------|
 | **Homepage** | home.simonemiglio.eu | Dashboard |
+| **Portfolio** | simonemiglio.eu | Personal website |
 | **Immich** | gallery.simonemiglio.eu | Photo management |
 | **Firefly III** | finanza.simonemiglio.eu | Finance tracker |
+| **Firefly Importer** | importer.finanza.simonemiglio.eu | Bank data import |
+| **Metabase** | analytics.simonemiglio.eu | Financial analytics |
+| **Actual Budget** | *(internal)* | Budget tracking |
 | **FastFood** | fastfood.simonemiglio.eu | Demo app |
 | **Uptime Kuma** | status.simonemiglio.eu | Monitoring |
 | **IT-Tools** | tools.simonemiglio.eu | Developer utilities |
@@ -112,9 +116,14 @@ Internet (HTTPS)
 │  └─────────┘ └─────────┘ └─────────┘       │
 │                                             │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
-│  │FastFood │ │ Uptime  │ │IT-Tools │       │
-│  │   Pod   │ │  Kuma   │ │   Pod   │       │
+│  │Metabase │ │FastFood │ │ Uptime  │       │
+│  │   Pod   │ │   Pod   │ │  Kuma   │       │
 │  └─────────┘ └─────────┘ └─────────┘       │
+│                                             │
+│  ┌─────────┐ ┌─────────┐                   │
+│  │IT-Tools │ │ Garage  │                   │
+│  │   Pod   │ │   Pod   │                   │
+│  └─────────┘ └─────────┘                   │
 └─────────────────────────────────────────────┘
 ```
 
@@ -136,8 +145,12 @@ podman/
 ├── kube_yaml/               # Pod definitions
 │   ├── caddy.pod.yaml
 │   ├── homepage.pod.yaml
+│   ├── site.pod.yaml        # Portfolio website
 │   ├── immich.pod.yaml
 │   ├── firefly.pod.yaml
+│   ├── firefly-importer.pod.yaml  # Bank data importer
+│   ├── metabase.pod.yaml    # Financial analytics dashboard
+│   ├── actual.pod.yaml      # Actual Budget
 │   ├── fastfood.pod.yaml
 │   ├── uptime-kuma.pod.yaml
 │   ├── portainer.pod.yaml
@@ -150,16 +163,18 @@ podman/
 │   └── services.yaml.example
 │
 ├── scripts/                 # Utility scripts
-│   ├── create_secrets.sh    # Interactive secrets setup
+│   ├── create_secrets.sh    # Interactive Podman secrets setup
 │   ├── nightly_backup.sh    # Automated nightly backups (cron)
-│   ├── setup_permission_fix.sh
-│   ├── setup_fail2ban.sh
-│   └── setup_cockpit.sh
+│   ├── restore_wizard.sh    # Interactive backup restore from S3
+│   ├── setup_permission_fix.sh  # Fix volume permissions after reboot
+│   ├── setup_fail2ban.sh    # SSH brute-force protection
+│   └── setup_cockpit.sh     # Install Cockpit web UI
 │
 ├── logs/                    # Backup logs (auto-created)
 │
 ├── docs/                    # Additional documentation
-│   └── ARCHITETTURA.md      # Architecture (Italian)
+│   ├── ARCHITETTURA.md      # Architecture (Italian)
+│   └── metabase_queries.md  # SQL queries for Metabase dashboards
 │
 ├── manage_finale.sh         # Main management script
 ├── README.md                # This file
@@ -189,12 +204,14 @@ Options:
 3. Stop Services
 4. Backup Immich (DB dump → cloud sync)
 5. Backup Firefly (DB + data → cloud sync)
-6. Backup System Tools (Kuma/Portainer)
-7. List Backups
-8. Full System Cleanup
-9. Setup & Verify Quadlet Config
-10. Restart Caddy Proxy
-11. Optimize Databases
+6. Backup Metabase (H2 DB → cloud sync)
+7. Backup System Tools (Kuma/Portainer)
+8. List Backups
+9. Restore / Download from S3
+10. Full System Cleanup
+11. Setup & Verify Quadlet Config
+12. Restart Caddy Proxy
+13. Optimize Databases
 
 ### Automated Backups
 

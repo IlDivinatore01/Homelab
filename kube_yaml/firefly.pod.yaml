@@ -18,6 +18,7 @@ spec:
     ports:
     - name: mysql
       containerPort: 3306
+      hostPort: 3306  # Expose to network for Metabase
     env:
     - name: MYSQL_RANDOM_ROOT_PASSWORD
       value: "yes"

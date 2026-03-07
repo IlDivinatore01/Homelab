@@ -72,6 +72,15 @@ create_secret "firefly-db-password" \
     "MariaDB password for Firefly database"
 
 # ===========================================
+# Homepage Secrets (Optional)
+# ===========================================
+echo ""
+echo "=== Homepage Secrets (for widgets) ==="
+
+create_secret "homepage-immich-apikey" \
+    "Immich API key (get from Immich → User Settings → API Keys)"
+
+# ===========================================
 # Summary
 # ===========================================
 echo ""

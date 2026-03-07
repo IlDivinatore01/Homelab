@@ -65,6 +65,12 @@ importer.finanza.yourdomain.com {
     import secure_headers
 }
 
+analytics.yourdomain.com {
+    reverse_proxy metabase-pod:3000
+    encode zstd gzip
+    import secure_headers
+}
+
 status.yourdomain.com {
     reverse_proxy uptime-kuma-pod:3001 {
         header_up Upgrade {http.request.header.Upgrade}
