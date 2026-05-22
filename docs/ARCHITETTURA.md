@@ -152,6 +152,37 @@ invoca `./manage_finale.sh --optimize-db`:
 
 Il log finisce in `logs/db_optimize_<data>.log` (rotazione: ultimi 60 giorni).
 
+### Notifiche ntfy
+
+Tutti gli script di cron (`nightly_backup`, `weekly_db_optimize`, `healthcheck_monitor`)
+emettono una notifica push sul topic `homelab-alerts` via `scripts/lib_notify.sh`:
+
+- ✅ tag `white_check_mark` → operazione completata
+- ⚠️ tag `warning` → recovery automatico tentato (es. container unhealthy)
+- 🚨 tag `rotating_light` → fallimento, intervento manuale richiesto
+
+Le credenziali sono in `.env` (`NTFY_URL`, `NTFY_TOPIC`, `NTFY_TOKEN`). Se mancano,
+gli script restano silenti (no-op).
+
+### Healthcheck e auto-recovery
+
+I pod critici (`firefly-app`, `firefly-importer`, `immich-app-server`) hanno
+un `livenessProbe` nei rispettivi `*.pod.yaml`. Lo script
+`scripts/healthcheck_monitor.sh` gira **ogni 5 minuti** da cron:
+
+1. cerca container marcati `unhealthy`
+2. riavvia il servizio systemd corrispondente
+3. invia un alert ntfy
+4. ha **flap protection** (30 min): se lo stesso servizio è ancora unhealthy
+   dopo un restart, manda l'alert "intervento manuale" senza retry continui
+
+### Restore wizard
+
+`scripts/restore_wizard.sh` può:
+
+- **`--verify <path>`**: verifica integrity di un backup (tar.gz o directory) senza ripristinare nulla
+- **interactive mode**: lista i backup locali / on-VPS / Garage S3, scarica se da S3, mostra le istruzioni di restore, ed eventualmente esegue il restore file (lo step SQL resta manuale per sicurezza)
+
 > ⚠️ **Nota storica**
 > Fino a maggio 2026 il nightly invocava il menu interattivo via heredoc
 > (`./manage_finale.sh <<< "4"`), causando un falso fallimento perché `set -e`

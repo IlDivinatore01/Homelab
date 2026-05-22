@@ -181,9 +181,13 @@ podman/
 │   ├── create_secrets.sh    # Idempotent Podman + k8s secrets setup
 │   ├── nightly_backup.sh    # Automated nightly backups (cron 03:00)
 │   ├── weekly_db_optimize.sh    # VACUUM + mariadb-check (cron Sun 04:30)
-│   ├── restore_wizard.sh    # Interactive backup restore from S3
+│   ├── healthcheck_monitor.sh   # Watches livenessProbe state (cron */5)
+│   ├── lib_notify.sh        # Tiny ntfy helper sourced by the cron scripts
+│   ├── restore_wizard.sh    # Restore from local/S3 + --verify dry-run
 │   ├── setup_permission_fix.sh  # Fix volume permissions after reboot
-│   ├── setup_fail2ban.sh    # SSH brute-force protection
+│   ├── setup_fail2ban.sh    # SSH brute-force protection (one-shot)
+│   ├── setup_fail2ban_caddy.sh  # fail2ban jail for Caddy logins (one-shot, sudo)
+│   ├── fail2ban/            # filter+jail files installed by the script above
 │   └── setup_cockpit.sh     # Install Cockpit web UI
 │
 ├── logs/                    # Backup logs (auto-created)
@@ -248,9 +252,13 @@ Options:
 
 | When | What | Script |
 |------|------|--------|
-| Daily 03:00 | Backup of Immich, Firefly, ntfy, Portainer, Uptime-Kuma → Garage S3 | `scripts/nightly_backup.sh` |
-| Sunday 04:30 | `VACUUM ANALYZE` on Immich Postgres + `mariadb-check --optimize` on Firefly | `scripts/weekly_db_optimize.sh` |
 | Every 5 min | Disk-usage heartbeats to Uptime Kuma | `/usr/local/bin/kuma_disk_push.sh` |
+| Every 5 min | Restart any container whose livenessProbe is failing, push an ntfy alert | `scripts/healthcheck_monitor.sh` |
+| Daily 03:00 | Backup of Immich, Firefly, ntfy, Portainer, Uptime-Kuma, Caddy → Garage S3 | `scripts/nightly_backup.sh` |
+| Sunday 04:30 | `VACUUM ANALYZE` on Immich Postgres + `mariadb-check --optimize` on Firefly | `scripts/weekly_db_optimize.sh` |
+
+All cron scripts emit an ntfy notification (success or failure) on the
+`homelab-alerts` topic when `NTFY_TOKEN` is set in `.env`.
 
 ```bash
 # Check nightly backup logs
@@ -293,8 +301,11 @@ journalctl --user -u caddy.service -f
 |---------|----------------|
 | **HTTPS** | Caddy + Let's Encrypt (auto) |
 | **Rootless** | All containers run as user |
-| **Fail2Ban** | SSH brute-force protection |
+| **Fail2Ban (SSH)** | scripts/setup_fail2ban.sh |
+| **Fail2Ban (Caddy)** | scripts/setup_fail2ban_caddy.sh — bans IPs producing 401/403 on the public sites |
 | **Headers** | HSTS, CSP, X-Frame-Options |
+| **livenessProbe** | Firefly, Immich, Importer auto-restarted on hang via cron monitor |
+| **Pre-commit hook** | `.githooks/pre-commit` blocks `.env`/`*.key` and runs shellcheck |
 
 ---
 

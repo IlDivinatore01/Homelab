@@ -245,18 +245,29 @@ rclone config
 ./manage_finale.sh --backup-all
 ```
 
-### 8.3 Setup Cron Job
-
-The nightly backup uses the non-interactive `--backup-all` mode so it can run
-unattended without hitting the interactive menu (older versions had a bug where
-cron always reported failure even on success).
+### 8.3 Setup Cron Jobs
 
 ```bash
 crontab -e
-
-# Add daily backup at 3 AM:
-0 3 * * * /home/osvaldo/podman/scripts/nightly_backup.sh
 ```
+
+Add:
+
+```cron
+# Container healthcheck monitor: restart unhealthy pods + ntfy alert
+*/5 * * * * /home/osvaldo/podman/scripts/healthcheck_monitor.sh
+
+# Daily backup at 03:00 — covers all live services
+0 3 * * * /home/osvaldo/podman/scripts/nightly_backup.sh
+
+# Weekly DB maintenance Sunday 04:30
+30 4 * * 0 /home/osvaldo/podman/scripts/weekly_db_optimize.sh
+```
+
+The `nightly_backup.sh` and `weekly_db_optimize.sh` wrappers use the
+non-interactive `--backup-all` / `--optimize-db` modes of `manage_finale.sh`
+(an older version piped `"4\n"` into the interactive menu, which caused cron
+to always report failure even when the backup actually succeeded).
 
 ---
 
@@ -332,13 +343,36 @@ Open in browser:
 
 ## 🔒 Step 10: Security Hardening
 
-### Enable Fail2Ban
+### Enable Fail2Ban (SSH)
 
 ```bash
+sudo ./scripts/setup_fail2ban.sh
+# or manually:
 sudo systemctl enable --now fail2ban
-
-# Check status
 sudo fail2ban-client status sshd
+```
+
+### Enable Fail2Ban (Caddy)
+
+After Caddy is running and writing to `data/caddy/log/access.log`:
+
+```bash
+sudo ./scripts/setup_fail2ban_caddy.sh
+sudo fail2ban-client status caddy-auth
+```
+
+This jail bans IPs that get more than 5 HTTP 401/403 responses in 10 minutes
+(typical brute-force pattern against Firefly/Immich/Portainer login pages).
+
+### Pre-commit hook
+
+The repo ships with a hook that blocks `.env`/`*.key` commits and runs
+`shellcheck` on staged shell scripts. Activate it once after cloning:
+
+```bash
+git config core.hooksPath .githooks
+# Install shellcheck for full linting (optional):
+sudo apt install shellcheck
 ```
 
 ### Configure Firewall (Optional)

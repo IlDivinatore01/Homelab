@@ -1,0 +1,55 @@
+#!/bin/bash
+# Pre-commit hook for the Homelab repo.
+# - Runs shellcheck on staged shell scripts (if installed)
+# - Refuses to commit .env or anything matching common secret patterns
+
+set -euo pipefail
+
+C_RED='\033[0;31m'; C_YELLOW='\033[0;33m'; C_GREEN='\033[0;32m'; C_RESET='\033[0m'
+
+err()  { echo -e "${C_RED}[pre-commit] $*${C_RESET}" >&2; }
+warn() { echo -e "${C_YELLOW}[pre-commit] $*${C_RESET}"; }
+ok()   { echo -e "${C_GREEN}[pre-commit] $*${C_RESET}"; }
+
+# Get the list of staged files (added/modified, not deleted).
+mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ "${#staged[@]}" -eq 0 ]; then
+  exit 0
+fi
+
+# 1) Block obvious secret files.
+for f in "${staged[@]}"; do
+  case "$f" in
+    .env|.env.local|.env.production|*.key|*.pem|secrets/*)
+      err "Refusing to commit potential secret file: $f"
+      err "If you really need to commit it, bypass with: git commit --no-verify"
+      exit 1
+      ;;
+  esac
+done
+
+# 2) Run shellcheck on staged shell scripts.
+shell_files=()
+for f in "${staged[@]}"; do
+  case "$f" in
+    *.sh|*.bash)         shell_files+=("$f") ;;
+    scripts/*[!.][!y][!a][!m][!l]) [[ -f "$f" ]] && head -1 "$f" 2>/dev/null | grep -q '^#!.*\(bash\|sh\)' && shell_files+=("$f") ;;
+  esac
+done
+
+if [ "${#shell_files[@]}" -gt 0 ]; then
+  if command -v shellcheck >/dev/null 2>&1; then
+    echo "[pre-commit] Running shellcheck on ${#shell_files[@]} shell file(s)..."
+    if ! shellcheck --severity=warning "${shell_files[@]}"; then
+      err "shellcheck found issues. Fix them or bypass with: git commit --no-verify"
+      exit 1
+    fi
+    ok "shellcheck passed."
+  else
+    warn "shellcheck not installed — skipping shell-script lint."
+    warn "Install it with: sudo apt install shellcheck"
+  fi
+fi
+
+exit 0
