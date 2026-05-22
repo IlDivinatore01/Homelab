@@ -83,16 +83,18 @@ You'll need to provide:
 
 ### 3.2 Host environment file (for backup scripts)
 
-The management script reads `.env` for the Garage S3 backup credentials so they
-are never committed to git:
+The management script reads `.env` for the Garage S3 backup credentials and
+the ntfy alert token, so neither end up in git:
 
 ```bash
 cp .env.example .env
 chmod 600 .env
-nano .env   # Fill in GARAGE_S3_ACCESS_KEY and GARAGE_S3_SECRET_KEY
+nano .env   # Fill in GARAGE_S3_* and (after §8c) NTFY_*
 ```
 
 The Garage access/secret pair is generated after Step 8b.3 (`garage key create backup-key`).
+The ntfy token is generated in §8c below — leave `NTFY_TOKEN` empty until then;
+the scripts will skip notifications silently.
 
 ---
 
@@ -316,6 +318,90 @@ podman exec garage-pod-garage /garage bucket allow --read --write --owner backup
 
 - **S3 API**: https://s3.yourdomain.com
 - **WebUI**: https://garage.yourdomain.com
+
+---
+
+## 🔔 Step 8c: Configure ntfy Alerting (Recommended)
+
+The cron scripts (`nightly_backup.sh`, `weekly_db_optimize.sh`,
+`healthcheck_monitor.sh`) send a push notification on success / warning /
+failure to a private ntfy topic. Setup is one-shot.
+
+### 8c.1 Lock down the server (already done in this repo)
+
+Check that `data/ntfy/config/server.yml` contains:
+
+```yaml
+auth-file: "/var/lib/ntfy/user.db"
+auth-default-access: "deny-all"
+```
+
+`deny-all` makes every topic require explicit per-user access; anonymous
+clients get HTTP 403.
+
+### 8c.2 Create the writer user (for the scripts)
+
+```bash
+# Create a low-privilege "writer" account
+podman exec -it ntfy-pod-ntfy ntfy user add --role=user backup-bot
+# (you'll be prompted for a password — just generate a random one,
+# you won't reuse it; access will be via a token)
+
+# Grant write-only access to a single topic
+podman exec ntfy-pod-ntfy ntfy access backup-bot homelab-alerts write-only
+
+# Mint a bearer token for the scripts
+podman exec ntfy-pod-ntfy ntfy token add backup-bot
+# → prints: tk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Copy the token into `.env`:
+
+```bash
+# Append to .env (chmod 600 already set)
+cat >> .env <<EOF
+
+# --- ntfy alerting ---
+NTFY_URL="https://notify.yourdomain.com"
+NTFY_TOPIC="homelab-alerts"
+NTFY_TOKEN="tk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+EOF
+```
+
+Test it:
+
+```bash
+cd ~/podman
+set -a; source .env; set +a
+source scripts/lib_notify.sh
+notify ok "ntfy test" "If you see this on your phone, it works."
+```
+
+### 8c.3 Create the reader user (for your phone)
+
+```bash
+podman exec -it ntfy-pod-ntfy ntfy user add --role=user homelab-reader
+# (set a password and write it down — you'll need it in the app)
+
+podman exec ntfy-pod-ntfy ntfy access homelab-reader homelab-alerts read-only
+```
+
+### 8c.4 Subscribe in the ntfy mobile app
+
+- **Topic:** `homelab-alerts`
+- **Server:** `https://notify.yourdomain.com` (your default)
+- **Username:** `homelab-reader`
+- **Password:** the one you just set
+
+### 8c.5 What the scripts will tell you
+
+- ✅ `white_check_mark` — operation completed successfully
+- ⚠️ `warning` — automatic recovery happened (e.g. a container was unhealthy
+  and was restarted)
+- 🚨 `rotating_light` — failure, manual intervention required
+
+If `NTFY_TOKEN` is empty or missing, the scripts are silent — there's never
+an error from a misconfigured notification path.
 
 ---
 
