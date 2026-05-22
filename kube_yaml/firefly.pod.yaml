@@ -16,9 +16,10 @@ spec:
   - name: firefly-db
     image: docker.io/library/mariadb:lts
     ports:
+    # Internal port only - reachable via pod DNS (firefly-pod:3306) on services_net.
+    # No hostPort: keeps MariaDB unreachable from outside the pod/network.
     - name: mysql
       containerPort: 3306
-      hostPort: 3306  # Expose to network for Metabase
     env:
     - name: MYSQL_RANDOM_ROOT_PASSWORD
       value: "yes"
@@ -37,8 +38,6 @@ spec:
         secretKeyRef:
           name: firefly-db-name-k8s
           key: dbname
-    securityContext:
-      privileged: true
     volumeMounts:
     - name: firefly-db-data
       mountPath: /var/lib/mysql
@@ -54,8 +53,6 @@ spec:
   # =======================================================
   - name: firefly-app
     image: docker.io/fireflyiii/core:latest
-    securityContext:
-      runAsUser: 0
     ports:
     - name: http
       containerPort: 8080
@@ -77,8 +74,10 @@ spec:
       value: "equal"
     - name: TZ
       value: "Europe/Rome"
+    # Trust only the services_net subnet (Caddy reverse proxy lives there).
+    # "**" would let any client spoof X-Forwarded-For.
     - name: TRUSTED_PROXIES
-      value: "**"
+      value: "10.89.0.0/24"
     - name: LOG_CHANNEL
       value: "stack"
     - name: APP_LOG_LEVEL
@@ -113,7 +112,7 @@ spec:
     - name: COOKIE_PATH
       value: "/"
     - name: COOKIE_SECURE
-      value: "false"
+      value: "true"
     - name: COOKIE_SAMESITE
       value: "lax"
     - name: MAIL_MAILER
@@ -130,6 +129,8 @@ spec:
       mountPath: /var/www/html/storage
     - name: firefly-bootstrap-cache
       mountPath: /var/www/html/bootstrap/cache
+    - name: nginx-log
+      mountPath: /var/log/nginx
     resources:
       requests:
         cpu: "200m"
@@ -181,5 +182,5 @@ spec:
     hostPath:
       path: /home/osvaldo/podman/data/firefly/bootstrap-cache
       type: DirectoryOrCreate
-
-
+  - name: nginx-log
+    emptyDir: {}

@@ -5,7 +5,9 @@ metadata:
 spec:
   containers:
   - name: uptime-kuma
-    image: docker.io/louislam/uptime-kuma:beta
+    # Pinned to the current beta version we have data for.
+    # Floating ':beta' auto-pulls new (potentially breaking) betas. Bump manually.
+    image: docker.io/louislam/uptime-kuma:2.1.0-beta.3
     ports:
     - containerPort: 3001
       hostPort: 3001

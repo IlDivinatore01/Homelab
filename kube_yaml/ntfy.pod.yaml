@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ntfy-pod
+  labels:
+    app: ntfy
+    io.containers.autoupdate: registry
+spec:
+  containers:
+  - name: ntfy
+    image: docker.io/binwiederhier/ntfy:latest
+    args: ["serve"]
+    ports:
+    - containerPort: 80
+      hostPort: 8180
+    volumeMounts:
+    - name: ntfy-config
+      mountPath: /etc/ntfy
+    - name: ntfy-cache
+      mountPath: /var/cache/ntfy
+    - name: ntfy-data
+      mountPath: /var/lib/ntfy
+    resources:
+      limits:
+        memory: 256Mi
+        cpu: 200m
+      requests:
+        memory: 64Mi
+        cpu: 50m
+  volumes:
+  - name: ntfy-config
+    hostPath:
+      path: /home/osvaldo/podman/data/ntfy/config
+      type: DirectoryOrCreate
+  - name: ntfy-cache
+    hostPath:
+      path: /home/osvaldo/podman/data/ntfy/cache
+      type: DirectoryOrCreate
+  - name: ntfy-data
+    hostPath:
+      path: /home/osvaldo/podman/data/ntfy/data
+      type: DirectoryOrCreate
+  restartPolicy: Always

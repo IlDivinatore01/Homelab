@@ -11,9 +11,6 @@ spec:
   initContainers:
   - name: init-storage
     image: docker.io/fireflyiii/data-importer:latest
-    securityContext:
-      runAsUser: 0  # Run as root to create directories
-      runAsGroup: 0
     command:
       - sh
       - -c
@@ -36,8 +33,6 @@ spec:
   containers:
   - name: firefly-importer
     image: docker.io/fireflyiii/data-importer:latest
-    securityContext:
-      runAsUser: 0  # Nginx richiede root
     ports:
     - name: importer-http
       containerPort: 8080
@@ -50,12 +45,13 @@ spec:
       value: "false"
     - name: TZ
       value: "Europe/Rome"
+    # Trust only the services_net subnet, not "**" (which would allow IP spoofing).
     - name: TRUSTED_PROXIES
-      value: "**"
+      value: "10.89.0.0/24"
     - name: EXPECT_SECURE_URL
       value: "false"
     - name: LOG_LEVEL
-      value: "debug"
+      value: "notice"
     volumeMounts:
     - name: php-fpm-conf
       mountPath: /usr/local/etc/php-fpm.d/www.conf

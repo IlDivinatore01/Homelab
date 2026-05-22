@@ -1,11 +1,10 @@
 #!/bin/bash
-# Nightly Backup Script for Immich and Firefly
-# Runs via cron at 3:00 AM
-# Logs to /home/osvaldo/podman/logs/nightly_backup.log
+# Nightly Backup Script
+# Runs via cron at 03:00. Uses the non-interactive --backup-all mode.
 
-set -e
+set -uo pipefail
 
-SCRIPT_DIR="/home/osvaldo/podman"
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd )"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/nightly_backup_$(date +%Y-%m-%d).log"
 
@@ -17,37 +16,14 @@ log() {
 
 log "=== NIGHTLY BACKUP STARTED ==="
 
-# Source the manage script functions
 cd "$SCRIPT_DIR"
 
-# Backup Immich
-log "Starting Immich backup..."
-if ./manage_finale.sh <<< "4" >> "$LOG_FILE" 2>&1; then
-    log "Immich backup completed successfully"
+if ./manage_finale.sh --backup-all >> "$LOG_FILE" 2>&1; then
+    log "Nightly backup completed successfully"
+    EXIT=0
 else
-    log "ERROR: Immich backup failed"
-fi
-
-# Small delay between backups
-sleep 5
-
-# Backup Firefly
-log "Starting Firefly backup..."
-if ./manage_finale.sh <<< "5" >> "$LOG_FILE" 2>&1; then
-    log "Firefly backup completed successfully"
-else
-    log "ERROR: Firefly backup failed"
-fi
-
-# Small delay between backups
-sleep 5
-
-# Backup Metabase
-log "Starting Metabase backup..."
-if ./manage_finale.sh <<< "6" >> "$LOG_FILE" 2>&1; then
-    log "Metabase backup completed successfully"
-else
-    log "ERROR: Metabase backup failed"
+    log "ERROR: Nightly backup reported failures (see log above)"
+    EXIT=1
 fi
 
 log "=== NIGHTLY BACKUP FINISHED ==="
@@ -55,4 +31,4 @@ log "=== NIGHTLY BACKUP FINISHED ==="
 # Cleanup old logs (keep last 7 days)
 find "$LOG_DIR" -name "nightly_backup_*.log" -mtime +7 -delete 2>/dev/null || true
 
-log "Old logs cleaned up"
+exit $EXIT

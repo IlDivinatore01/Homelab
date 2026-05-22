@@ -52,14 +52,19 @@ spec:
     - name: IMMICH_MACHINE_LEARNING_URL
       value: "http://127.0.0.1:3003"
     - name: IMMICH_LOG_LEVEL
-      value: "debug"
+      value: "warn"
     volumeMounts:
     - name: immich-uploads-volume
       mountPath: /data
     - name: host-localtime-volume
       mountPath: /etc/localtime
       readOnly: true
-#    resources: { requests: { cpu: "200m", memory: "512Mi" }, limits: { memory: "2Gi" } }
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        memory: "2Gi"
 
     # --- Immich Machine Learning ---
   - name: immich-machine-learning
@@ -95,7 +100,13 @@ spec:
     volumeMounts:
     - name: immich-model-cache-volume
       mountPath: /cache
-#    resources: { requests: { cpu: "200m", memory: "512Mi" }, limits: { memory: "4Gi" } }
+    # Server has 4 GB total RAM. Cap ML at 2Gi to avoid global OOM.
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        memory: "2Gi"
 
     # --- Valkey (Redis) ---
   - name: immich-valkey

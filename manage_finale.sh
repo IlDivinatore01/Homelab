@@ -14,20 +14,28 @@ PODMAN_SETUP_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && 
 MAIN_DATA_DIR="$PODMAN_SETUP_DIR/data/site"
 BACKUP_BASE_DIR="$PODMAN_SETUP_DIR/backups"
 
+# Load environment variables from .env (gitignored secrets)
+if [ -f "$PODMAN_SETUP_DIR/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$PODMAN_SETUP_DIR/.env"
+  set +a
+fi
+
 SHARED_NETWORK_NAME="services_net"
 SHARED_NETWORK_UNIT="${SHARED_NETWORK_NAME}-network.service"
 
 CONTINUE_ON_RESTART_ERROR=true
-MAX_BACKUPS_PER_SERVICE=1
+MAX_BACKUPS_PER_SERVICE=3
 OFFSITE_BACKUP_DIR="/mnt/immich_storage/Full_VPS_Backups"
 OFFSITE_LIMIT=5
 
-# S3 Backup Configuration (Garage)
-S3_ENDPOINT="http://localhost:3900"
-S3_BUCKET="backups"
-S3_REGION="garage"
-S3_ACCESS_KEY="GK6a9e75d2eb754591df2c9233"
-S3_SECRET_KEY="102002dace2a347d3301144558c46a4ce2bdeb2cea751c01b320b32ab715be31"
+# S3 Backup Configuration (Garage) - credentials loaded from .env
+S3_ENDPOINT="${GARAGE_S3_ENDPOINT:-http://localhost:3900}"
+S3_BUCKET="${GARAGE_S3_BUCKET:-backups}"
+S3_REGION="${GARAGE_S3_REGION:-garage}"
+S3_ACCESS_KEY="${GARAGE_S3_ACCESS_KEY:-}"
+S3_SECRET_KEY="${GARAGE_S3_SECRET_KEY:-}"
 USE_S3_BACKUP=true  # Set to false to use old rsync method
 
 declare -A PODS=(
@@ -36,17 +44,19 @@ declare -A PODS=(
   [immich]="$PODMAN_SETUP_DIR/kube_yaml/immich.pod.yaml"
   [firefly]="$PODMAN_SETUP_DIR/kube_yaml/firefly.pod.yaml"
   [firefly-importer]="$PODMAN_SETUP_DIR/kube_yaml/firefly-importer.pod.yaml"
-  [metabase]="$PODMAN_SETUP_DIR/kube_yaml/metabase.pod.yaml"
   [uptime-kuma]="$PODMAN_SETUP_DIR/kube_yaml/uptime-kuma.pod.yaml"
   [portainer]="$PODMAN_SETUP_DIR/kube_yaml/portainer.pod.yaml"
   [it-tools]="$PODMAN_SETUP_DIR/kube_yaml/it-tools.pod.yaml"
   [garage]="$PODMAN_SETUP_DIR/kube_yaml/garage.pod.yaml"
-
-
+  [ntfy]="$PODMAN_SETUP_DIR/kube_yaml/ntfy.pod.yaml"
   [fastfood]="$PODMAN_SETUP_DIR/kube_yaml/fastfood.pod.yaml"
-  [actual]="$PODMAN_SETUP_DIR/kube_yaml/actual.pod.yaml"
 )
-SERVICES=(homepage site immich firefly firefly-importer metabase actual uptime-kuma portainer fastfood it-tools garage)
+SERVICES=(homepage site immich firefly firefly-importer uptime-kuma portainer fastfood it-tools garage ntfy)
+
+# Servizi disabilitati (YAML rinominato .disabilitato, quadlet rimosso):
+# - metabase (analytics): non più usato, dati ancora in data/metabase/
+# - actual (budget):      non più usato, dati ancora in data/actual/
+# Per riattivare: rinominare il .yaml, ri-aggiungere a PODS/SERVICES, e rilanciare 'verify_quadlets'.
 
 # --- LOGGING UTILS ---
 C_RESET='\033[0m'
@@ -245,6 +255,12 @@ sync_to_cloud() {
   local log_file="/tmp/cloud_sync_${service_name}_$(date +%Y%m%d_%H%M%S).log"
 
   if [ "$USE_S3_BACKUP" = true ]; then
+    # Validate S3 credentials are loaded (from .env)
+    if [ -z "${S3_ACCESS_KEY:-}" ] || [ -z "${S3_SECRET_KEY:-}" ]; then
+      error "S3 credentials missing. Set GARAGE_S3_ACCESS_KEY/GARAGE_S3_SECRET_KEY in $PODMAN_SETUP_DIR/.env"
+      return 1
+    fi
+
     # Use S3 (Garage) for backup
     info "Starting S3 upload to s3://$S3_BUCKET/..."
     info "Progress log: $log_file"
@@ -480,6 +496,24 @@ backup_portainer() {
   sync_to_cloud "portainer" "$backup_dir"
 }
 
+backup_ntfy() {
+  ensure_shared_network
+  check_dependencies
+  local NTFY_DATA_DIR="$PODMAN_SETUP_DIR/data/ntfy"
+  local timestamp backup_dir
+  timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
+  backup_dir="$BACKUP_BASE_DIR/ntfy_backup_$timestamp"
+
+  title "BACKUP NTFY"
+  rotate_backups "ntfy"
+  mkdir -p "$backup_dir"
+  info "Backing up Data Files..."
+  rsync -a --info=progress2 "$NTFY_DATA_DIR/" "$backup_dir/data/" && \
+    success "ntfy backup complete!"
+    
+  sync_to_cloud "ntfy" "$backup_dir"
+}
+
 backup_metabase() {
   ensure_shared_network
   check_dependencies
@@ -616,6 +650,10 @@ update_generic() {
     "uptime-kuma")
       backup_uptime_kuma
       pull_img="docker.io/louislam/uptime-kuma:beta"
+      ;;
+    "ntfy")
+      backup_ntfy
+      pull_img="docker.io/binwiederhier/ntfy:latest"
       ;;
 
     *)
@@ -794,9 +832,8 @@ main_menu() {
     echo "----------------------------"
     echo " 4) Backup Immich"
     echo " 5) Backup Firefly III"
-    echo " 6) Backup Metabase"
-    echo " 7) Backup System Tools (Kuma/Portainer)"
-    
+    echo " 7) Backup System Tools (Kuma/Portainer/ntfy)"
+
     echo " 8) List Backups"
     echo " 9) Restore / Download from S3"
     echo "----------------------------"
@@ -861,8 +898,7 @@ main_menu() {
         ;;
       4) backup_immich ;;
       5) backup_firefly ;;
-      6) backup_metabase ;;
-      7) backup_uptime_kuma; backup_portainer ;;
+      7) backup_uptime_kuma; backup_portainer; backup_ntfy ;;
 
       8) echo ""; ls -lht "$BACKUP_BASE_DIR"/ | head -20 ;;
       9) download_from_s3 ;;
@@ -876,9 +912,73 @@ main_menu() {
   done
 }
 
+# --- NON-INTERACTIVE MODE (for cron / scripts) ---
+# Usage: ./manage_finale.sh --backup-all
+#        ./manage_finale.sh --backup <service>
+#        ./manage_finale.sh --restart <service>
+run_non_interactive() {
+  local cmd="$1"
+  shift || true
+  case "$cmd" in
+    --backup-all)
+      title "AUTOMATED NIGHTLY BACKUP"
+      local failed=()
+      backup_immich      || failed+=("immich")
+      backup_firefly     || failed+=("firefly")
+      backup_uptime_kuma || failed+=("uptime-kuma")
+      backup_portainer   || failed+=("portainer")
+      backup_ntfy        || failed+=("ntfy")
+      if [ "${#failed[@]}" -gt 0 ]; then
+        error "Backup failures: ${failed[*]}"
+        return 1
+      fi
+      success "All scheduled backups completed."
+      return 0
+      ;;
+    --backup)
+      local svc="${1:-}"
+      case "$svc" in
+        immich)       backup_immich ;;
+        firefly)      backup_firefly ;;
+        uptime-kuma)  backup_uptime_kuma ;;
+        portainer)    backup_portainer ;;
+        ntfy)         backup_ntfy ;;
+        *)            error "Unknown service for backup: '$svc'"; return 1 ;;
+      esac
+      ;;
+    --restart)
+      local svc="${1:-}"
+      [ -z "$svc" ] && { error "Usage: --restart <service>"; return 1; }
+      restart_service "$svc"
+      ;;
+    --optimize-db)
+      optimize_databases
+      ;;
+    --help|-h)
+      echo "Usage:"
+      echo "  $0                         # Interactive menu"
+      echo "  $0 --backup-all            # Backup all services (for cron)"
+      echo "  $0 --backup <service>      # Backup a single service"
+      echo "  $0 --restart <service>     # Restart a single service"
+      echo "  $0 --optimize-db           # VACUUM Postgres + mariadb-check (for cron)"
+      return 0
+      ;;
+    *)
+      error "Unknown flag: '$cmd'. Use --help for usage."
+      return 1
+      ;;
+  esac
+}
+
 # --- ENTRY POINT ---
 check_dependencies
 ensure_not_root
 ensure_runroot_ok
 ensure_shared_network
+
+if [ $# -gt 0 ]; then
+  run_non_interactive "$@"
+  exit $?
+fi
+
 main_menu
