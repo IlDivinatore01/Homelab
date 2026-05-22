@@ -32,6 +32,8 @@ spec:
       mountPath: /data       # For ACME certs etc.
     - name: caddy-config-volume # For other Caddy configs/state
       mountPath: /config
+    - name: caddy-log-volume   # Access logs read by fail2ban on the host
+      mountPath: /var/log/caddy
     resources:
       requests:
         cpu: "100m"
@@ -52,4 +54,8 @@ spec:
   - name: caddy-config-volume
     hostPath:
       path: /home/osvaldo/podman/data/caddy/config_data
+      type: DirectoryOrCreate
+  - name: caddy-log-volume
+    hostPath:
+      path: /home/osvaldo/podman/data/caddy/log
       type: DirectoryOrCreate

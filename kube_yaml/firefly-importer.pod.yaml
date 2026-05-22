@@ -63,6 +63,16 @@ spec:
         memory: "128Mi"
       limits:
         memory: "256Mi"
+    livenessProbe:
+      exec:
+        command:
+          - sh
+          - -c
+          - "curl -fsS -o /dev/null http://127.0.0.1:8080/ || exit 1"
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
   
   volumes:
   - name: php-fpm-conf

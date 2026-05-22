@@ -65,6 +65,18 @@ spec:
         memory: "512Mi"
       limits:
         memory: "2Gi"
+    livenessProbe:
+      exec:
+        # Use 127.0.0.1 explicitly: 'localhost' resolves to ::1 first and
+        # Podman's healthcheck does not fall back to IPv4 the way curl alone would.
+        command:
+          - sh
+          - -c
+          - "curl -fsS http://127.0.0.1:2283/api/server/ping || exit 1"
+      initialDelaySeconds: 90
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
 
     # --- Immich Machine Learning ---
   - name: immich-machine-learning

@@ -1,0 +1,13 @@
+# /etc/fail2ban/jail.d/caddy-auth.conf
+# Bans IPs that produce too many 401/403 responses against Caddy.
+# This catches brute-force attempts against Firefly, Immich, Portainer, etc.
+
+[caddy-auth]
+enabled  = true
+port     = http,https
+filter   = caddy-auth
+logpath  = /home/osvaldo/podman/data/caddy/log/access.log
+maxretry = 5
+findtime = 10m
+bantime  = 1h
+action   = iptables-multiport[name=caddy-auth, port="http,https", protocol=tcp]

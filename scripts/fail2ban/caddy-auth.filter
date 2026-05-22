@@ -1,0 +1,12 @@
+# /etc/fail2ban/filter.d/caddy-auth.conf
+# Matches HTTP 401/403 responses in Caddy's JSON access log.
+# Pattern: any line containing "remote_ip":"<IP>" and "status": 401 or 403.
+
+[Definition]
+failregex = ^.*"remote_ip":"<HOST>".*"status":(401|403).*$
+ignoreregex =
+
+# We re-use HOST from fail2ban's built-in patterns. The JSON line is unstructured
+# w.r.t. fail2ban so the timestamp comes from journald/file mtime, not from the log.
+journalmatch =
+datepattern = ^.*"ts":(?P<ts>\d+\.\d+)
