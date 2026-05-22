@@ -510,8 +510,29 @@ backup_ntfy() {
   info "Backing up Data Files..."
   rsync -a --info=progress2 "$NTFY_DATA_DIR/" "$backup_dir/data/" && \
     success "ntfy backup complete!"
-    
+
   sync_to_cloud "ntfy" "$backup_dir"
+}
+
+# Backs up Caddy's ACME state (certificates + private keys + accounts) and the
+# Caddyfile itself. Small (a few hundred KB) but essential to avoid hitting
+# Let's Encrypt rate limits on a full disaster recovery.
+backup_caddy() {
+  ensure_shared_network
+  check_dependencies
+  local CADDY_DATA_DIR="$PODMAN_SETUP_DIR/data/caddy"
+  local timestamp backup_dir
+  timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
+  backup_dir="$BACKUP_BASE_DIR/caddy_backup_$timestamp"
+
+  title "BACKUP CADDY (ACME certs + Caddyfile)"
+  rotate_backups "caddy"
+  mkdir -p "$backup_dir"
+  info "Backing up Caddyfile and ACME state..."
+  rsync -a --info=progress2 "$CADDY_DATA_DIR/" "$backup_dir/data/" && \
+    success "Caddy backup complete!"
+
+  sync_to_cloud "caddy" "$backup_dir"
 }
 
 backup_metabase() {
@@ -898,7 +919,7 @@ main_menu() {
         ;;
       4) backup_immich ;;
       5) backup_firefly ;;
-      7) backup_uptime_kuma; backup_portainer; backup_ntfy ;;
+      7) backup_uptime_kuma; backup_portainer; backup_ntfy; backup_caddy ;;
 
       8) echo ""; ls -lht "$BACKUP_BASE_DIR"/ | head -20 ;;
       9) download_from_s3 ;;
@@ -928,6 +949,7 @@ run_non_interactive() {
       backup_uptime_kuma || failed+=("uptime-kuma")
       backup_portainer   || failed+=("portainer")
       backup_ntfy        || failed+=("ntfy")
+      backup_caddy       || failed+=("caddy")
       if [ "${#failed[@]}" -gt 0 ]; then
         error "Backup failures: ${failed[*]}"
         return 1
@@ -943,6 +965,7 @@ run_non_interactive() {
         uptime-kuma)  backup_uptime_kuma ;;
         portainer)    backup_portainer ;;
         ntfy)         backup_ntfy ;;
+        caddy)        backup_caddy ;;
         *)            error "Unknown service for backup: '$svc'"; return 1 ;;
       esac
       ;;
