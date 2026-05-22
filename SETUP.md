@@ -63,6 +63,8 @@ git clone https://forgejo.it/simonemiglio/FastFood.git FastFood
 
 ## 🔐 Step 3: Create Secrets
 
+### 3.1 Podman secrets (for containers)
+
 Run the interactive secrets creation script:
 
 ```bash
@@ -79,6 +81,19 @@ You'll need to provide:
 | `firefly-app-key` | Run: `openssl rand -base64 32` |
 | `firefly-db-password` | Choose a strong password |
 
+### 3.2 Host environment file (for backup scripts)
+
+The management script reads `.env` for the Garage S3 backup credentials so they
+are never committed to git:
+
+```bash
+cp .env.example .env
+chmod 600 .env
+nano .env   # Fill in GARAGE_S3_ACCESS_KEY and GARAGE_S3_SECRET_KEY
+```
+
+The Garage access/secret pair is generated after Step 8b.3 (`garage key create backup-key`).
+
 ---
 
 ## ⚙️ Step 4: Configure Services
@@ -86,7 +101,7 @@ You'll need to provide:
 ### 4.1 Create Data Directories
 
 ```bash
-mkdir -p data/{caddy,homepage/config,immich,firefly,metabase,actual,uptime-kuma,portainer,fastfood,it-tools}
+mkdir -p data/{caddy,homepage/config,immich,firefly,metabase,actual,uptime-kuma,portainer,fastfood,it-tools,ntfy/{config,cache,data}}
 mkdir -p backups
 ```
 
@@ -159,6 +174,7 @@ Add these A records pointing to your server IP:
 | `analytics` | A | `YOUR_SERVER_IP` |
 | `s3` | A | `YOUR_SERVER_IP` |
 | `garage` | A | `YOUR_SERVER_IP` |
+| `notify` | A | `YOUR_SERVER_IP` |
 
 ---
 
@@ -218,17 +234,28 @@ rclone config
 ### 8.2 Test Backup
 
 ```bash
+# Interactive (manual run, picks one service)
 ./manage_finale.sh
 # Select option 4 (Backup Immich) to test
+
+# Or non-interactive (single service)
+./manage_finale.sh --backup immich
+
+# Or non-interactive (all services, what cron uses)
+./manage_finale.sh --backup-all
 ```
 
 ### 8.3 Setup Cron Job
+
+The nightly backup uses the non-interactive `--backup-all` mode so it can run
+unattended without hitting the interactive menu (older versions had a bug where
+cron always reported failure even on success).
 
 ```bash
 crontab -e
 
 # Add daily backup at 3 AM:
-0 3 * * * /home/osvaldo/podman/manage_finale.sh backup-all
+0 3 * * * /home/osvaldo/podman/scripts/nightly_backup.sh
 ```
 
 ---

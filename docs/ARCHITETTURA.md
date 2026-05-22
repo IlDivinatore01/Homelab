@@ -1,5 +1,5 @@
 # 📘 SERVER ARCHITECTURE WIKI
-**Data di aggiornamento:** Febbraio 2026
+**Data di aggiornamento:** Maggio 2026
 **Autore:** Osvaldo & Gemini
 
 Questo documento spiega l'architettura **"Self-Healing"** (auto-riparante) del server.
@@ -104,6 +104,13 @@ Ecco dove si trovano i pezzi fondamentali del tuo server:
 * **`~/podman/manage_finale.sh`**
   🛠️ **Il Pannello di Controllo**
   Lo script principale per eseguire backup, aggiornamenti, pulizia e manutenzione ordinaria.
+  Supporta sia il menu interattivo (avvio senza argomenti) sia una modalità non-interattiva
+  pensata per cron/script: `--backup-all`, `--backup <servizio>`, `--restart <servizio>`, `--help`.
+
+* **`~/podman/.env`**
+  🔑 **Variabili d'ambiente segrete (gitignored)**
+  Contiene le credenziali Garage S3 usate dagli script di backup. Permessi `600`.
+  Esiste come template in `.env.example` — copiare e compilare al primo setup.
 
 * **`~/podman/data/`**
   💾 **I Dati Persistenti**
@@ -113,10 +120,57 @@ Ecco dove si trovano i pezzi fondamentali del tuo server:
 * **`~/podman/backups/`**
   📦 **I Backup**
   Dove vengono salvati i dump dei database e i file compressi generati dallo script `manage_finale.sh`.
+  Rotazione locale: 3 backup per servizio. Rotazione remota su Garage S3: 5 backup per servizio.
 
 ---
 
-## 5. Repository Git
+## 5. Backup Automatici
+
+I backup notturni partono via cron alle **03:00**, eseguendo lo script
+`scripts/nightly_backup.sh`, che a sua volta invoca:
+
+```bash
+./manage_finale.sh --backup-all
+```
+
+La modalità `--backup-all` (non-interattiva) esegue in sequenza:
+
+1. **Immich** — `pg_dumpall` di Postgres + ML cache → `tar.gz` → upload su Garage S3.
+2. **Firefly III** — `mariadb-dump` + cartella `storage/` → `tar.gz` → S3.
+3. **Uptime Kuma**, **Portainer**, **ntfy** — copia diretta dei volumi dati → `tar.gz` → S3.
+
+> Servizi dismessi (Metabase, Actual Budget) non sono nel ciclo; i loro dati
+> restano in `data/<servizio>/` ma il container non viene avviato.
+
+### Manutenzione DB settimanale
+
+Ogni **domenica alle 04:30** parte `scripts/weekly_db_optimize.sh` (cron) che
+invoca `./manage_finale.sh --optimize-db`:
+
+- **Immich Postgres**: `VACUUM ANALYZE` (libera spazio, ricalcola le statistiche del planner)
+- **Firefly MariaDB**: `mariadb-check --optimize` (defrag tabelle InnoDB)
+
+Il log finisce in `logs/db_optimize_<data>.log` (rotazione: ultimi 60 giorni).
+
+> ⚠️ **Nota storica**
+> Fino a maggio 2026 il nightly invocava il menu interattivo via heredoc
+> (`./manage_finale.sh <<< "4"`), causando un falso fallimento perché `set -e`
+> nello script principale terminava male alla chiusura di stdin. Il fix è la
+> modalità `--backup-all` introdotta in questa revisione.
+
+### Controllare i backup
+
+```bash
+# Log dell'ultima notte
+cat ~/podman/logs/nightly_backup_$(date +%Y-%m-%d).log
+
+# Backup remoti su Garage S3
+./manage_finale.sh   # opzione 9 — Restore / Download from S3
+```
+
+---
+
+## 6. Repository Git
 
 Il progetto è diviso in **3 repository indipendenti** su Forgejo:
 

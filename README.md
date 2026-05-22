@@ -33,8 +33,6 @@ Self-hosted infrastructure running on Podman with Systemd Quadlet integration.
 | **Immich** | gallery.simonemiglio.eu | Photo management |
 | **Firefly III** | finanza.simonemiglio.eu | Finance tracker |
 | **Firefly Importer** | importer.finanza.simonemiglio.eu | Bank data import |
-| **Metabase** | analytics.simonemiglio.eu | Financial analytics |
-| **Actual Budget** | *(internal)* | Budget tracking |
 | **FastFood** | fastfood.simonemiglio.eu | Demo app |
 | **Uptime Kuma** | status.simonemiglio.eu | Monitoring |
 | **IT-Tools** | tools.simonemiglio.eu | Developer utilities |
@@ -42,6 +40,14 @@ Self-hosted infrastructure running on Podman with Systemd Quadlet integration.
 | **Cockpit** | panel.simonemiglio.eu | System admin |
 | **Garage S3** | s3.simonemiglio.eu | S3-compatible storage |
 | **Garage WebUI** | garage.simonemiglio.eu | S3 admin interface |
+| **ntfy** | notify.simonemiglio.eu | Push notifications |
+
+### Disabled (kept on disk, not auto-started)
+
+| Service | Reason |
+|---------|--------|
+| **Metabase** | No longer used. Data preserved in `data/metabase/`. To re-enable: rename `kube_yaml/metabase.pod.yaml.disabilitato` and re-add to `manage_finale.sh`. |
+| **Actual Budget** | No longer used. Data preserved in `data/actual/`. Same re-enable procedure. |
 
 ---
 
@@ -79,14 +85,22 @@ git clone https://forgejo.it/simonemiglio/FastFood.git FastFood
 ./scripts/create_secrets.sh
 ```
 
-### Step 3: Configure
+### Step 3: Configure environment file
+
+```bash
+cp .env.example .env
+chmod 600 .env
+# Fill in GARAGE_S3_ACCESS_KEY / GARAGE_S3_SECRET_KEY (see SETUP.md §3.2)
+```
+
+### Step 4: Configure Caddy
 
 ```bash
 cp config_examples/Caddyfile.example data/caddy/Caddyfile
 # Edit with your domain
 ```
 
-### Step 4: Start Services
+### Step 5: Start Services
 
 ```bash
 ./manage_finale.sh
@@ -120,10 +134,10 @@ Internet (HTTPS)
 │  │   Pod   │ │   Pod   │ │  Kuma   │       │
 │  └─────────┘ └─────────┘ └─────────┘       │
 │                                             │
-│  ┌─────────┐ ┌─────────┐                   │
-│  │IT-Tools │ │ Garage  │                   │
-│  │   Pod   │ │   Pod   │                   │
-│  └─────────┘ └─────────┘                   │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
+│  │IT-Tools │ │ Garage  │ │  ntfy   │       │
+│  │   Pod   │ │   Pod   │ │   Pod   │       │
+│  └─────────┘ └─────────┘ └─────────┘       │
 └─────────────────────────────────────────────┘
 ```
 
@@ -155,6 +169,7 @@ podman/
 │   ├── uptime-kuma.pod.yaml
 │   ├── portainer.pod.yaml
 │   ├── garage.pod.yaml      # Gitignored (contains auth hash)
+│   ├── ntfy.pod.yaml          # Push notification server
 │   └── it-tools.pod.yaml
 │
 ├── config_examples/         # Configuration templates
@@ -163,8 +178,9 @@ podman/
 │   └── services.yaml.example
 │
 ├── scripts/                 # Utility scripts
-│   ├── create_secrets.sh    # Interactive Podman secrets setup
-│   ├── nightly_backup.sh    # Automated nightly backups (cron)
+│   ├── create_secrets.sh    # Idempotent Podman + k8s secrets setup
+│   ├── nightly_backup.sh    # Automated nightly backups (cron 03:00)
+│   ├── weekly_db_optimize.sh    # VACUUM + mariadb-check (cron Sun 04:30)
 │   ├── restore_wizard.sh    # Interactive backup restore from S3
 │   ├── setup_permission_fix.sh  # Fix volume permissions after reboot
 │   ├── setup_fail2ban.sh    # SSH brute-force protection
@@ -177,6 +193,8 @@ podman/
 │   └── metabase_queries.md  # SQL queries for Metabase dashboards
 │
 ├── manage_finale.sh         # Main management script
+├── .env                     # Gitignored - host secrets (S3 creds, etc.)
+├── .env.example             # Template for .env
 ├── README.md                # This file
 └── SETUP.md                 # Full setup guide
 ```
@@ -213,9 +231,26 @@ Options:
 12. Restart Caddy Proxy
 13. Optimize Databases
 
-### Automated Backups
+### Non-Interactive Mode (cron / scripts)
 
-Nightly backups run automatically at **3:00 AM** via cron:
+```bash
+./manage_finale.sh --backup-all            # Backup every tracked service
+./manage_finale.sh --backup immich         # Backup a single service
+./manage_finale.sh --restart firefly       # Restart a service
+./manage_finale.sh --optimize-db           # VACUUM Postgres + mariadb-check
+./manage_finale.sh --help                  # Show usage
+```
+
+`scripts/nightly_backup.sh` runs `--backup-all` daily at 03:00.
+`scripts/weekly_db_optimize.sh` runs `--optimize-db` every Sunday at 04:30.
+
+### Automated Schedule
+
+| When | What | Script |
+|------|------|--------|
+| Daily 03:00 | Backup of Immich, Firefly, ntfy, Portainer, Uptime-Kuma → Garage S3 | `scripts/nightly_backup.sh` |
+| Sunday 04:30 | `VACUUM ANALYZE` on Immich Postgres + `mariadb-check --optimize` on Firefly | `scripts/weekly_db_optimize.sh` |
+| Every 5 min | Disk-usage heartbeats to Uptime Kuma | `/usr/local/bin/kuma_disk_push.sh` |
 
 ```bash
 # Check nightly backup logs

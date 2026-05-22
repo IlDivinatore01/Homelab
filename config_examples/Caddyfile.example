@@ -108,3 +108,10 @@ panel.yourdomain.com {
     }
     import secure_headers
 }
+
+# ntfy (Push Notifications)
+notify.yourdomain.com {
+    reverse_proxy ntfy-pod:80
+    encode zstd gzip
+    import secure_headers
+}
