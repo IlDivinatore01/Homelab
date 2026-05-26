@@ -20,11 +20,26 @@ spec:
       value: "0.0.0.0"
     - name: HOSTNAME
       value: "0.0.0.0"
+    - name: PORT
+      value: "3000"
     - name: HOMEPAGE_VAR_IMMICH_API_KEY
       valueFrom:
         secretKeyRef:
           name: homepage-immich-key-k8s
           key: apikey
+    # Next.js binds to the pod's IP, not 127.0.0.1, so the image's baked-in
+    # HEALTHCHECK (targeting loopback) always fails. Override with a probe
+    # that goes through services_net DNS to the pod's actual interface.
+    livenessProbe:
+      exec:
+        command:
+          - sh
+          - -c
+          - "wget -q --spider --timeout=3 http://homepage-pod:3000/ || exit 1"
+      initialDelaySeconds: 30
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
     volumeMounts:
     - name: homepage-config-volume
       mountPath: /app/config

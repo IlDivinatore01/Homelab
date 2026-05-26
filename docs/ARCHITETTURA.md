@@ -137,7 +137,8 @@ La modalità `--backup-all` (non-interattiva) esegue in sequenza:
 
 1. **Immich** — `pg_dumpall` di Postgres + ML cache → `tar.gz` → upload su Garage S3.
 2. **Firefly III** — `mariadb-dump` + cartella `storage/` → `tar.gz` → S3.
-3. **Uptime Kuma**, **Portainer**, **ntfy** — copia diretta dei volumi dati → `tar.gz` → S3.
+3. **Uptime Kuma** — snapshot atomico SQLite (`.backup`) + rsync del data dir → `tar.gz` → S3. Lo snapshot evita backup corrotti se Kuma sta scrivendo durante il rsync; al restore preferire `kuma_snapshot.db` a `kuma.db`.
+4. **Portainer**, **ntfy** — copia diretta dei volumi dati → `tar.gz` → S3.
 
 > Servizi dismessi (Metabase, Actual Budget) non sono nel ciclo; i loro dati
 > restano in `data/<servizio>/` ma il container non viene avviato.

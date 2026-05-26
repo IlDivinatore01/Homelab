@@ -182,6 +182,7 @@ podman/
 │   ├── nightly_backup.sh    # Automated nightly backups (cron 03:00)
 │   ├── weekly_db_optimize.sh    # VACUUM + mariadb-check (cron Sun 04:30)
 │   ├── healthcheck_monitor.sh   # Watches livenessProbe state (cron */5)
+│   ├── kuma_system_push.sh      # Push mem/load/disk heartbeats to Uptime Kuma
 │   ├── lib_notify.sh        # Tiny ntfy helper sourced by the cron scripts
 │   ├── restore_wizard.sh    # Restore from local/S3 + --verify dry-run
 │   ├── setup_permission_fix.sh  # Fix volume permissions after reboot
@@ -226,8 +227,7 @@ Options:
 3. Stop Services
 4. Backup Immich (DB dump → cloud sync)
 5. Backup Firefly (DB + data → cloud sync)
-6. Backup Metabase (H2 DB → cloud sync)
-7. Backup System Tools (Kuma/Portainer)
+7. Backup System Tools (Kuma/Portainer/ntfy/Caddy)
 8. List Backups
 9. Restore / Download from S3
 10. Full System Cleanup
@@ -252,7 +252,7 @@ Options:
 
 | When | What | Script |
 |------|------|--------|
-| Every 5 min | Disk-usage heartbeats to Uptime Kuma | `/usr/local/bin/kuma_disk_push.sh` |
+| Every 5 min | Disk/memory/load heartbeats to Uptime Kuma (see [docs/kuma_setup.md](docs/kuma_setup.md)) | `scripts/kuma_system_push.sh` + legacy `kuma_disk_push.sh` |
 | Every 5 min | Restart any container whose livenessProbe is failing, push an ntfy alert | `scripts/healthcheck_monitor.sh` |
 | Daily 03:00 | Backup of Immich, Firefly, ntfy, Portainer, Uptime-Kuma, Caddy → Garage S3 | `scripts/nightly_backup.sh` |
 | Sunday 04:30 | `VACUUM ANALYZE` on Immich Postgres + `mariadb-check --optimize` on Firefly | `scripts/weekly_db_optimize.sh` |
@@ -360,6 +360,7 @@ The `fix-podman-permissions.service` runs automatically. If issues persist:
 |----------|-------------|
 | [SETUP.md](SETUP.md) | Complete setup guide |
 | [docs/ARCHITETTURA.md](docs/ARCHITETTURA.md) | Architecture details (Italian) |
+| [docs/kuma_setup.md](docs/kuma_setup.md) | Uptime Kuma advanced setup (monitors, ntfy, tags, push checks) |
 
 ---
 

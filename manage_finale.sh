@@ -464,6 +464,7 @@ backup_uptime_kuma() {
   ensure_shared_network
   check_dependencies
   local KUMA_DATA_DIR="$PODMAN_SETUP_DIR/data/uptime-kuma"
+  local KUMA_CONTAINER="uptime-kuma-pod-uptime-kuma"
   local timestamp backup_dir
   timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
   backup_dir="$BACKUP_BASE_DIR/uptime-kuma_backup_$timestamp"
@@ -471,10 +472,31 @@ backup_uptime_kuma() {
   title "BACKUP UPTIME KUMA"
   rotate_backups "uptime-kuma"
   mkdir -p "$backup_dir"
+
+  # Atomic SQLite snapshot first (covers WAL too) — safer than copying a
+  # live kuma.db, which may be mid-write when rsync hits it.
+  if podman container exists "$KUMA_CONTAINER" && \
+     [ "$(podman inspect -f '{{.State.Running}}' "$KUMA_CONTAINER")" = "true" ]; then
+    info "Taking atomic SQLite snapshot of kuma.db..."
+    if podman exec "$KUMA_CONTAINER" sqlite3 /app/data/kuma.db ".backup /app/data/kuma_snapshot.db" 2>/dev/null; then
+      success "Snapshot created."
+    else
+      warn "sqlite3 .backup failed (will rely on raw rsync)."
+    fi
+  else
+    warn "Uptime Kuma container not running — backup will be raw file copy only."
+  fi
+
   info "Backing up Data Files..."
   rsync -a --info=progress2 "$KUMA_DATA_DIR/" "$backup_dir/data/" && \
     success "Uptime Kuma backup complete!"
-    
+
+  # Cleanup the in-container snapshot after rsync has copied it out.
+  if podman container exists "$KUMA_CONTAINER" && \
+     [ "$(podman inspect -f '{{.State.Running}}' "$KUMA_CONTAINER")" = "true" ]; then
+    podman exec "$KUMA_CONTAINER" rm -f /app/data/kuma_snapshot.db 2>/dev/null || true
+  fi
+
   sync_to_cloud "uptime-kuma" "$backup_dir"
 }
 
@@ -816,9 +838,14 @@ cleanup_all() {
   info "Cleaning Podman (Containers, Images, Pods, Build Cache)..."
   podman system df
   podman container prune -f --filter "until=24h"
+  # Dangling layers > 10 days (orphans from image re-pulls).
   podman image prune -f --filter "until=240h"
+  # Tagged-but-unused images > 30 days (e.g. images of disabled services,
+  # old aws-cli copies pulled by backups, stale build artifacts).
+  podman image prune -a -f --filter "until=720h"
   podman pod prune -f
   podman builder prune -f
+  podman system df
   success "Cleanup Finished."
 }
 

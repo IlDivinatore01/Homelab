@@ -264,6 +264,12 @@ Add:
 
 # Weekly DB maintenance Sunday 04:30
 30 4 * * 0 /home/osvaldo/podman/scripts/weekly_db_optimize.sh
+
+# Uptime Kuma push heartbeats (every 5 min) — see docs/kuma_setup.md for
+# creating the push monitors and copying their URLs here.
+# */5 * * * * /home/osvaldo/podman/scripts/kuma_system_push.sh mem  80 95  "https://status.yourdomain.com/api/push/<TOKEN_MEM>"
+# */5 * * * * /home/osvaldo/podman/scripts/kuma_system_push.sh load 200 400 "https://status.yourdomain.com/api/push/<TOKEN_LOAD>"
+# */5 * * * * /home/osvaldo/podman/scripts/kuma_system_push.sh disk / 80 90 "https://status.yourdomain.com/api/push/<TOKEN_DISK>"
 ```
 
 The `nightly_backup.sh` and `weekly_db_optimize.sh` wrappers use the
