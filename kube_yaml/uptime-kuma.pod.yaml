@@ -11,6 +11,8 @@ spec:
     # NET_RAW kept so ICMP ping monitors keep working; everything else dropped.
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       readOnlyRootFilesystem: true
       capabilities:
         drop:

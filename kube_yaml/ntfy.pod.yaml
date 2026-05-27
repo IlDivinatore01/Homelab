@@ -12,6 +12,8 @@ spec:
     args: ["serve"]
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       readOnlyRootFilesystem: true
       capabilities:
         drop:

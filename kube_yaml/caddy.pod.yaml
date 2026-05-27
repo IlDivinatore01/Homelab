@@ -17,6 +17,8 @@ spec:
     # the effective set is honored despite allowPrivilegeEscalation:false).
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       readOnlyRootFilesystem: true
       capabilities:
         drop:

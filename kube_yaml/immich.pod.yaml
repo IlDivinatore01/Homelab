@@ -13,6 +13,8 @@ spec:
     image: ghcr.io/immich-app/immich-server:release
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       capabilities:
         drop:
         - ALL
@@ -146,6 +148,8 @@ spec:
     # 'valkey' user then drops via gosu -> needs the DB-style cap set.
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       capabilities:
         drop:
         - ALL
@@ -167,6 +171,8 @@ spec:
     # 'postgres' user via gosu -> needs CHOWN/DAC_OVERRIDE/FOWNER/SETGID/SETUID.
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       capabilities:
         drop:
         - ALL

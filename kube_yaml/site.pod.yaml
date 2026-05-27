@@ -12,6 +12,8 @@ spec:
     image: localhost/main-backend:1.0.0 # Ensure this image is available
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       readOnlyRootFilesystem: true
       capabilities:
         drop:
@@ -39,6 +41,8 @@ spec:
     # Binds only the high port 8080 internally -> no NET_BIND_SERVICE needed.
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       readOnlyRootFilesystem: true
       capabilities:
         drop:

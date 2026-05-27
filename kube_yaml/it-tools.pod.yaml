@@ -13,6 +13,8 @@ spec:
       # workers as nginx user), so it needs the classic nginx cap set.
       securityContext:
         allowPrivilegeEscalation: false
+        seccompProfile:
+          type: RuntimeDefault
         readOnlyRootFilesystem: true
         capabilities:
           drop:

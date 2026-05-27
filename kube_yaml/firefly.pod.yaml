@@ -19,6 +19,8 @@ spec:
     # 'mysql' user via gosu -> needs CHOWN/DAC_OVERRIDE/FOWNER/SETGID/SETUID.
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       capabilities:
         drop:
         - ALL
@@ -75,6 +77,8 @@ spec:
       runAsUser: 0
       runAsGroup: 0
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       capabilities:
         drop:
         - ALL
@@ -186,6 +190,8 @@ spec:
     image: docker.io/library/alpine:latest
     securityContext:
       allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
       capabilities:
         drop:
         - ALL
