@@ -39,7 +39,10 @@ mkdir -p "$SYSTEMD_USER_DIR"
 cat > "$SYSTEMD_USER_DIR/fix-podman-permissions.service" << 'UNIT'
 [Unit]
 Description=Fix Podman Storage Ownership for Osvaldo
-Before=homepage.service site.service immich.service firefly.service firefly-importer.service uptime-kuma.service portainer.service fastfood.service it-tools.service caddy.service
+# Must precede services_net-network too: the network create needs
+# /run/user/1000/libpod already owned by osvaldo, else its sticky-bit chmod
+# fails (EPERM) and services_net-network.service ends up 'failed'.
+Before=services_net-network.service homepage.service site.service immich.service firefly.service firefly-importer.service uptime-kuma.service portainer.service fastfood.service it-tools.service caddy.service garage.service ntfy.service
 PartOf=default.target
 
 [Service]
