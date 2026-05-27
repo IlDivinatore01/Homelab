@@ -12,6 +12,7 @@ spec:
     image: localhost/main-backend:1.0.0 # Ensure this image is available
     securityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop:
         - ALL
@@ -23,6 +24,9 @@ spec:
       value: "production"
     - name: CORS_ORIGIN
       value: "https://simonemiglio.eu" # This is correct for the public-facing URL
+    volumeMounts:
+    - name: backend-tmp
+      mountPath: /tmp
     resources:
       requests:
         cpu: "100m"
@@ -35,6 +39,7 @@ spec:
     # Binds only the high port 8080 internally -> no NET_BIND_SERVICE needed.
     securityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop:
         - ALL
@@ -42,6 +47,12 @@ spec:
     - name: internal-http # Port exposed by this Caddy to the pod/services_net network
       containerPort: 8080 # << Use this port for internal Caddy
     volumeMounts:
+    - name: sitecaddy-data
+      mountPath: /data
+    - name: sitecaddy-cfgstate
+      mountPath: /config
+    - name: sitecaddy-tmp
+      mountPath: /tmp
     - name: frontend-dist
       mountPath: /usr/share/caddy
     - name: caddy-config
@@ -54,6 +65,14 @@ spec:
         memory: "128Mi"
 
   volumes:
+  - name: backend-tmp
+    emptyDir: {}
+  - name: sitecaddy-data
+    emptyDir: {}
+  - name: sitecaddy-cfgstate
+    emptyDir: {}
+  - name: sitecaddy-tmp
+    emptyDir: {}
   - name: frontend-dist
     hostPath:
       path: /home/osvaldo/podman/data/site/frontend_dist # Absolute path

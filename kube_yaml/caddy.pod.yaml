@@ -17,6 +17,7 @@ spec:
     # the effective set is honored despite allowPrivilegeEscalation:false).
     securityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop:
         - ALL
@@ -34,6 +35,8 @@ spec:
       protocol: UDP
       hostPort: 443        # Expose on host
     volumeMounts:
+    - name: tmp
+      mountPath: /tmp
     - name: caddyfile
       mountPath: /etc/caddy/Caddyfile
       # subPath: Caddyfile     # Mounts only the Caddyfile file
@@ -53,6 +56,8 @@ spec:
         memory: "512Mi"
         ephemeral-storage: "2Gi"
   volumes:
+  - name: tmp
+    emptyDir: {}
   - name: caddyfile
     hostPath:
       path: /home/osvaldo/podman/data/caddy/Caddyfile # Dir containing Caddyfile

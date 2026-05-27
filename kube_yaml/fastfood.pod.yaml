@@ -9,6 +9,8 @@ spec:
   automountServiceAccountToken: false
   restartPolicy: Always
   volumes:
+  - name: tmp
+    emptyDir: {}
   - name: uploaded-images
     hostPath:
       path: /home/osvaldo/podman/data/fastfood/uploads
@@ -20,6 +22,7 @@ spec:
     image: localhost/fastfood-backend:1.0.0
     securityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop:
         - ALL
@@ -45,6 +48,8 @@ spec:
     - name: ALLOWED_ORIGINS
       value: "https://fastfood.simonemiglio.eu"
     volumeMounts:
+    - name: tmp
+      mountPath: /tmp
     - name: uploaded-images
       mountPath: /app/frontend/public/images/uploads
     resources:

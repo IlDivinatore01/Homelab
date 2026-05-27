@@ -12,6 +12,7 @@ spec:
     image: ghcr.io/gethomepage/homepage:latest
     securityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop:
         - ALL
@@ -46,6 +47,10 @@ spec:
       timeoutSeconds: 5
       failureThreshold: 3
     volumeMounts:
+    - name: nextjs-cache
+      mountPath: /app/.next/cache
+    - name: tmp
+      mountPath: /tmp
     - name: homepage-config-volume
       mountPath: /app/config
     resources:
@@ -57,6 +62,10 @@ spec:
         memory: "256Mi"
         ephemeral-storage: "2Gi"
   volumes:
+  - name: nextjs-cache
+    emptyDir: {}
+  - name: tmp
+    emptyDir: {}
   - name: homepage-config-volume
     hostPath:
       path: /home/osvaldo/podman/data/homepage/config

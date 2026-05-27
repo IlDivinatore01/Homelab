@@ -12,6 +12,7 @@ spec:
     args: ["serve"]
     securityContext:
       allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
       capabilities:
         drop:
         - ALL
@@ -21,6 +22,8 @@ spec:
     - containerPort: 80
       hostPort: 8180
     volumeMounts:
+    - name: tmp
+      mountPath: /tmp
     - name: ntfy-config
       mountPath: /etc/ntfy
     - name: ntfy-cache
@@ -35,6 +38,8 @@ spec:
         memory: 64Mi
         cpu: 50m
   volumes:
+  - name: tmp
+    emptyDir: {}
   - name: ntfy-config
     hostPath:
       path: /home/osvaldo/podman/data/ntfy/config
