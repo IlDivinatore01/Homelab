@@ -127,14 +127,20 @@ ensure_shared_network() {
     systemctl --user start "${SHARED_NETWORK_UNIT}" || true
   fi
 
-  # Hard guarantee: the network must exist for kube units using --network=services_net.
-  if podman network exists "$SHARED_NETWORK_NAME"; then
-    return 0
+  # Start the isolated sensitive_net unit too (firefly/immich/caddy need it).
+  if systemctl --user list-unit-files --no-pager 2>/dev/null | grep -q "^sensitive_net-network.service"; then
+    systemctl --user start "sensitive_net-network.service" || true
   fi
 
-  warn "Podman network '$SHARED_NETWORK_NAME' missing. Creating..."
-  podman network create "$SHARED_NETWORK_NAME" >/dev/null
-  success "Network '$SHARED_NETWORK_NAME' created."
+  # Hard guarantee: both networks must exist for kube units that reference them.
+  local n
+  for n in "$SHARED_NETWORK_NAME" "sensitive_net"; do
+    if ! podman network exists "$n"; then
+      warn "Podman network '$n' missing. Creating..."
+      podman network create "$n" >/dev/null
+      success "Network '$n' created."
+    fi
+  done
 }
 
 restart_service() {
@@ -187,12 +193,23 @@ bootstrap_quadlets() {
   local systemd_dir="$HOME/.config/containers/systemd"
   mkdir -p "$systemd_dir"
 
-  # Create Network Quadlet if missing
+  # Create Network Quadlets if missing. Two trust zones:
+  #  - services_net : general / less-trusted app pods (it-tools, garage, ntfy, ...)
+  #  - sensitive_net: isolated zone for the data crown jewels (Firefly finances,
+  #    Immich photos). Untrusted pods on services_net cannot reach firefly's
+  #    MariaDB / immich's Postgres. Only Caddy (multi-homed) bridges in.
   if [ ! -f "$systemd_dir/services_net.network" ]; then
     info "Bootstrapping services_net.network..."
     cat > "$systemd_dir/services_net.network" <<EOF
 [Network]
 NetworkName=services_net
+EOF
+  fi
+  if [ ! -f "$systemd_dir/sensitive_net.network" ]; then
+    info "Bootstrapping sensitive_net.network..."
+    cat > "$systemd_dir/sensitive_net.network" <<EOF
+[Network]
+NetworkName=sensitive_net
 EOF
   fi
 
@@ -211,6 +228,23 @@ EOF
     [ -n "$prev" ] && after_chain="After=network-online.target
 After=$prev.service"
 
+    # Network per trust zone. Referenced as '<net>.network' (quadlet unit name,
+    # not bare network name) so quadlet adds Requires=/After= on the network
+    # service -> robust boot ordering. firefly/importer/immich are isolated on
+    # sensitive_net; caddy is multi-homed to bridge both zones. homepage stays
+    # on services_net only (its next-server binds a single interface, so
+    # multi-homing breaks Caddy's inbound proxy) and reaches Immich via the host
+    # port instead.
+    local net_block
+    case "$svc" in
+      firefly|firefly-importer|immich)
+        net_block="Network=sensitive_net.network" ;;
+      caddy)
+        net_block=$'Network=services_net.network\nNetwork=sensitive_net.network' ;;
+      *)
+        net_block="Network=services_net.network" ;;
+    esac
+
     if [ ! -f "$kube_file" ]; then
       info "Bootstrapping $svc.kube (after: ${prev:-network})..."
       cat > "$kube_file" <<EOF
@@ -221,7 +255,7 @@ $after_chain
 
 [Kube]
 Yaml=$yaml_path
-Network=services_net
+$net_block
 
 [Service]
 TimeoutStartSec=300
