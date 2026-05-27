@@ -48,6 +48,7 @@ Self-hosted infrastructure running on Podman with Systemd Quadlet integration.
 |---------|--------|
 | **Metabase** | No longer used. Data preserved in `data/metabase/`. To re-enable: rename `kube_yaml/metabase.pod.yaml.disabilitato` and re-add to `manage_finale.sh`. |
 | **Actual Budget** | No longer used. Data preserved in `data/actual/`. Same re-enable procedure. |
+| **Immich Machine Learning** | Sub-container commented out in `kube_yaml/immich.pod.yaml` to free ~170MB RAM (Smart Search / Faces / OCR unused). Image + model cache kept on disk. Re-enable: uncomment the block + restart + flip the ML toggles in Immich admin UI. |
 
 ---
 

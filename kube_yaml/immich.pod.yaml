@@ -78,47 +78,61 @@ spec:
       timeoutSeconds: 5
       failureThreshold: 3
 
-    # --- Immich Machine Learning ---
-  - name: immich-machine-learning
-    image: ghcr.io/immich-app/immich-machine-learning:release
-    env:
-    - name: MACHINE_LEARNING_WORKERS
-      value: "1"
-    - name: MACHINE_LEARNING_WORKER_TIMEOUT
-      value: "120"
-    - name: DB_HOSTNAME
-      value: "127.0.0.1"
-    - name: REDIS_HOSTNAME
-      value: "127.0.0.1"
-    - name: IMMICH_VERSION
-      value: "release"
-    - name: NODE_ENV
-      value: "production"
-    # --- Force IPv4 Binding Here ---
-    - name: MACHINE_LEARNING_HOST
-      value: "0.0.0.0"
-    - name: IMMICH_HOST  # Critical for some ML versions
-      value: "0.0.0.0"
-    - name: HOST         # Fallback for Uvicorn
-      value: "0.0.0.0"
-    - name: MACHINE_LEARNING_PORT
-      value: "3003"
-    - name: DB_USERNAME
-      valueFrom: { secretKeyRef: { name: immich-db-user-k8s, key: username } }
-    - name: DB_PASSWORD
-      valueFrom: { secretKeyRef: { name: immich-db-password-k8s, key: password } }
-    - name: DB_DATABASE_NAME
-      valueFrom: { secretKeyRef: { name: immich-db-name-k8s, key: dbname } }
-    volumeMounts:
-    - name: immich-model-cache-volume
-      mountPath: /cache
-    # Server has 4 GB total RAM. Cap ML at 2Gi to avoid global OOM.
-    resources:
-      requests:
-        cpu: "200m"
-        memory: "512Mi"
-      limits:
-        memory: "2Gi"
+    # ================================================================
+    # Immich Machine Learning — DISABLED 2026-05-27 to free ~170MB RAM.
+    # Smart Search / Facial Recognition / OCR not used. Image (1.39GB) and
+    # model cache (data/immich/immich_model_cache, 786MB) kept on disk for
+    # instant re-enable — no re-download.
+    #
+    # TO RE-ENABLE:
+    #   1. Uncomment the container block below (strip the leading '#  ')
+    #   2. systemctl --user restart immich.service
+    #   3. Immich → Administration → Settings → Machine Learning: turn
+    #      Smart Search + Facial Recognition back on, then run the
+    #      "Smart Search" / "Face Detection" jobs to backfill new photos.
+    # ----------------------------------------------------------------
+    #  # --- Immich Machine Learning ---
+    #  - name: immich-machine-learning
+    #    image: ghcr.io/immich-app/immich-machine-learning:release
+    #    env:
+    #    - name: MACHINE_LEARNING_WORKERS
+    #      value: "1"
+    #    - name: MACHINE_LEARNING_WORKER_TIMEOUT
+    #      value: "120"
+    #    - name: DB_HOSTNAME
+    #      value: "127.0.0.1"
+    #    - name: REDIS_HOSTNAME
+    #      value: "127.0.0.1"
+    #    - name: IMMICH_VERSION
+    #      value: "release"
+    #    - name: NODE_ENV
+    #      value: "production"
+    #    # --- Force IPv4 Binding Here ---
+    #    - name: MACHINE_LEARNING_HOST
+    #      value: "0.0.0.0"
+    #    - name: IMMICH_HOST  # Critical for some ML versions
+    #      value: "0.0.0.0"
+    #    - name: HOST         # Fallback for Uvicorn
+    #      value: "0.0.0.0"
+    #    - name: MACHINE_LEARNING_PORT
+    #      value: "3003"
+    #    - name: DB_USERNAME
+    #      valueFrom: { secretKeyRef: { name: immich-db-user-k8s, key: username } }
+    #    - name: DB_PASSWORD
+    #      valueFrom: { secretKeyRef: { name: immich-db-password-k8s, key: password } }
+    #    - name: DB_DATABASE_NAME
+    #      valueFrom: { secretKeyRef: { name: immich-db-name-k8s, key: dbname } }
+    #    volumeMounts:
+    #    - name: immich-model-cache-volume
+    #      mountPath: /cache
+    #    # Server has 4 GB total RAM. Cap ML at 2Gi to avoid global OOM.
+    #    resources:
+    #      requests:
+    #        cpu: "200m"
+    #        memory: "512Mi"
+    #      limits:
+    #        memory: "2Gi"
+    # ================================================================
 
     # --- Valkey (Redis) ---
   - name: immich-valkey
