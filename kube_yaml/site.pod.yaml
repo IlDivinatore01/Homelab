@@ -4,7 +4,7 @@ metadata:
   name: main-pod # This name is used by global-caddy
   labels:
     app: main
-    io.containers.autoupdate: "image" # Optional
+    io.containers.autoupdate: "local" # local image (built via build_site); 'registry'/'image' fails auto-update on localhost/*
 spec:
   automountServiceAccountToken: false
   containers:

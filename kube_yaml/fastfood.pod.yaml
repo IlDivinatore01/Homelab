@@ -4,7 +4,7 @@ metadata:
   name: fastfood-pod
   labels:
     app: fastfood
-    io.containers.autoupdate: "image"
+    io.containers.autoupdate: "local" # local image (built via build_fastfood); 'registry'/'image' fails auto-update on localhost/*
 spec:
   automountServiceAccountToken: false
   restartPolicy: Always
