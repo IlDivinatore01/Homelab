@@ -213,6 +213,13 @@ After=network-online.target
 Yaml=$yaml_path
 Network=services_net
 
+[Service]
+# At boot ~12 pods run 'podman kube play' concurrently and contend on
+# podman's sqlite state DB. With the default 90s start timeout, the slow
+# ones get SIGKILLed mid-kube-play, leaving a half-created (wedged) pod
+# that then hangs podman. 5 min lets each play finish under contention.
+TimeoutStartSec=300
+
 [Install]
 WantedBy=default.target
 EOF
