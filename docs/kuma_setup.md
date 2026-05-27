@@ -98,10 +98,17 @@ Poi assegna ai monitor (apri ogni monitor → **Tags** → aggiungi):
 
 In Kuma crea **2 monitor di tipo Push**:
 
-| Nome | Type | Heartbeat Interval | Tag |
-|---|---|---|---|
-| `Memory %` | Push | `300s` | `sistema` |
-| `Load 5min` | Push | `300s` | `sistema` |
+| Nome | Type | Heartbeat Interval | Retries | Tag |
+|---|---|---|---|---|
+| `Memory %` | Push | `600s` | `1` | `sistema` |
+| `Load 5min` | Push | `600s` | `1` | `sistema` |
+
+> ⚠️ **Heartbeat Interval va impostato a 600s anche se il cron gira ogni 5 min (300s).**
+> Se la finestra Kuma = periodo del cron, il jitter del cron (un beat che arriva
+> a 302s invece di 300s) fa scattare falsi "No heartbeat in the time window".
+> Con finestra 600s servono **due** push saltati di fila per un vero allarme —
+> i falsi spariscono e una vera interruzione viene comunque rilevata in ~10 min.
+> Stessa cosa vale per i 2 push disk esistenti (portali a 600s).
 
 Per ognuno, Kuma genera un URL del tipo:
 

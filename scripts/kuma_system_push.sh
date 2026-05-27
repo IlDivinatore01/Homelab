@@ -20,8 +20,13 @@ push() {
   # sample params '?status=up&msg=OK&ping=' baked in; copy-pasting that and
   # appending more params produces a malformed URL with two '?').
   url="${url%%\?*}"
-  curl -fsS -m 10 -o /dev/null \
-    "${url}?status=${status}&msg=$(printf %s "$msg" | sed 's/ /%20/g')&ping=${value}"
+  # --data-urlencode encodes everything correctly (incl. the '%' in values),
+  # so Kuma decodes a clean message ("mem=42% warn=80%") instead of literal
+  # '%20'/garbled percent-sequences.
+  curl -fsS -m 10 -o /dev/null -G "$url" \
+    --data-urlencode "status=${status}" \
+    --data-urlencode "msg=${msg}" \
+    --data-urlencode "ping=${value}"
 }
 
 metric="${1:?Usage: $0 <mem|load|disk> ...}"
