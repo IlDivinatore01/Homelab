@@ -18,6 +18,11 @@ spec:
   initContainers:
   - name: init-storage
     image: docker.io/fireflyiii/data-importer:latest
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
     command:
       - sh
       - -c
@@ -40,6 +45,19 @@ spec:
   containers:
   - name: firefly-importer
     image: docker.io/fireflyiii/data-importer:latest
+    # serversideup s6 entrypoint runs as root (pod runAsUser:0) and drops
+    # workers to www-data -> needs CHOWN/DAC_OVERRIDE/FOWNER/SETGID/SETUID.
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - SETGID
+        - SETUID
     ports:
     - name: importer-http
       containerPort: 8080

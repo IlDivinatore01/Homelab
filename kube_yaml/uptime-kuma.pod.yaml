@@ -8,6 +8,14 @@ spec:
     # Pinned to the current beta version we have data for.
     # Floating ':beta' auto-pulls new (potentially breaking) betas. Bump manually.
     image: docker.io/louislam/uptime-kuma:2.1.0-beta.3
+    # NET_RAW kept so ICMP ping monitors keep working; everything else dropped.
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - NET_RAW
     ports:
     - containerPort: 3001
       hostPort: 3001

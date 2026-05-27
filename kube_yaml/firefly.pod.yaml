@@ -15,6 +15,19 @@ spec:
   # =======================================================
   - name: firefly-db
     image: docker.io/library/mariadb:lts
+    # MariaDB entrypoint starts as root, chowns the datadir then drops to the
+    # 'mysql' user via gosu -> needs CHOWN/DAC_OVERRIDE/FOWNER/SETGID/SETUID.
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - SETGID
+        - SETUID
     ports:
     # Internal port only - reachable via pod DNS (firefly-pod:3306) on services_net.
     # No hostPort: keeps MariaDB unreachable from outside the pod/network.
@@ -61,6 +74,16 @@ spec:
     securityContext:
       runAsUser: 0
       runAsGroup: 0
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - SETGID
+        - SETUID
     ports:
     - name: http
       containerPort: 8080
@@ -161,6 +184,11 @@ spec:
   # =======================================================
   - name: firefly-cron
     image: docker.io/library/alpine:latest
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
     env:
     - name: TZ
       value: "Europe/Rome"

@@ -10,6 +10,11 @@ spec:
   containers:
   - name: backend
     image: localhost/main-backend:1.0.0 # Ensure this image is available
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
     ports:
     - name: backend-http
       containerPort: 3000
@@ -27,6 +32,12 @@ spec:
 
   - name: main-caddy # Kept 'caddy' in your original, you can rename for clarity if you wish
     image: docker.io/library/caddy:2-alpine
+    # Binds only the high port 8080 internally -> no NET_BIND_SERVICE needed.
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
     ports:
     - name: internal-http # Port exposed by this Caddy to the pod/services_net network
       containerPort: 8080 # << Use this port for internal Caddy

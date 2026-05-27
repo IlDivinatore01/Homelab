@@ -11,6 +11,11 @@ spec:
     # --- Immich Server Application ---
   - name: immich-app-server
     image: ghcr.io/immich-app/immich-server:release
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
     ports:
     - name: http-immich
       containerPort: 2283
@@ -137,6 +142,19 @@ spec:
     # --- Valkey (Redis) ---
   - name: immich-valkey
     image: docker.io/valkey/valkey:8-bookworm@sha256:42cba146593a5ea9a622002c1b7cba5da7be248650cbb64ecb9c6c33d29794b1
+    # valkey/redis entrypoint starts as root, chowns its datadir to the
+    # 'valkey' user then drops via gosu -> needs the DB-style cap set.
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - SETGID
+        - SETUID
     ports:
     - name: valkey-port
       containerPort: 6379
@@ -145,6 +163,19 @@ spec:
     # --- PostgreSQL Database ---
   - name: immich-postgres
     image: ghcr.io/immich-app/postgres:14-vectorchord0.3.0-pgvectors0.2.0
+    # Postgres entrypoint starts as root, chowns PGDATA then drops to the
+    # 'postgres' user via gosu -> needs CHOWN/DAC_OVERRIDE/FOWNER/SETGID/SETUID.
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - SETGID
+        - SETUID
     ports:
     - name: postgres-port
       containerPort: 5432
