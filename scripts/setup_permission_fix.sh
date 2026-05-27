@@ -6,12 +6,15 @@ echo "Creating sudoers rule for Podman storage ownership fix..."
 
 # Create sudoers drop-in file
 sudo tee /etc/sudoers.d/osvaldo-podman-fix << 'EOF'
-# Allow osvaldo to fix Podman storage ownership without password
-# Required for fix-podman-permissions.service
+# Allow osvaldo to fix Podman runtime-dir ownership without password
+# Required for fix-podman-permissions.service.
+# NOTE: the podman graphroot (/mnt/.../podman-root) is intentionally NOT here.
+# 'chown -R' on the graphroot flattens rootless subuid ownership of image
+# layers and breaks non-root-in-container processes (firefly php/nginx EACCES
+# crash-loop). Storage ownership is managed by podman's user namespace.
 osvaldo ALL=(ALL) NOPASSWD: /bin/chown -R osvaldo\:osvaldo /run/user/1000/containers
 osvaldo ALL=(ALL) NOPASSWD: /bin/chown -R osvaldo\:osvaldo /run/user/1000/libpod
 osvaldo ALL=(ALL) NOPASSWD: /bin/chown -R osvaldo\:osvaldo /run/user/1000/podman
-osvaldo ALL=(ALL) NOPASSWD: /bin/chown -R osvaldo\:osvaldo /mnt/HC_Volume_103834258/podman-root
 EOF
 
 # Set correct permissions (required for sudoers files)
@@ -27,10 +30,35 @@ else
     exit 1
 fi
 
+# Create / refresh the systemd user service (idempotent).
+# Only fixes the runtime dir (/run/user/1000). It must NEVER chown the podman
+# graphroot: 'chown -R' there flattens rootless subuid ownership of image
+# layers and breaks non-root-in-container processes (firefly php/nginx EACCES).
+SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+mkdir -p "$SYSTEMD_USER_DIR"
+cat > "$SYSTEMD_USER_DIR/fix-podman-permissions.service" << 'UNIT'
+[Unit]
+Description=Fix Podman Storage Ownership for Osvaldo
+Before=homepage.service site.service immich.service firefly.service firefly-importer.service uptime-kuma.service portainer.service fastfood.service it-tools.service caddy.service
+PartOf=default.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Runtime dir only (RAM). '-' prefix: never fail if a path is absent at boot.
+ExecStart=-/usr/bin/sudo /bin/chown -R osvaldo:osvaldo /run/user/1000/containers
+ExecStart=-/usr/bin/sudo /bin/chown -R osvaldo:osvaldo /run/user/1000/libpod
+ExecStart=-/usr/bin/sudo /bin/chown -R osvaldo:osvaldo /run/user/1000/podman
+ExecStart=-/bin/true
+
+[Install]
+WantedBy=default.target
+UNIT
+
 # Enable the systemd user service
 systemctl --user daemon-reload
 systemctl --user enable fix-podman-permissions.service
-echo "✅ fix-podman-permissions.service enabled!"
+echo "✅ fix-podman-permissions.service installed & enabled!"
 
 # Mask the root podman timer (final prevention)
 sudo systemctl mask podman-auto-update.timer
