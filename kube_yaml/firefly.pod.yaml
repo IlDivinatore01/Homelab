@@ -53,6 +53,14 @@ spec:
   # =======================================================
   - name: firefly-app
     image: docker.io/fireflyiii/core:latest
+    # Run the serversideup entrypoint as root (in-container uid 0 → host uid
+    # 1000) so it can write /etc/nginx/nginx.conf at startup, then it drops
+    # workers to www-data internally. Required because the image ships
+    # /etc/nginx owned by root: running directly as www-data (the image's
+    # default User) can't write it -> EACCES crash-loop.
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
     ports:
     - name: http
       containerPort: 8080

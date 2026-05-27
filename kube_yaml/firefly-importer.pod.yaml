@@ -6,7 +6,14 @@ metadata:
     app: firefly-importer
 spec:
   automountServiceAccountToken: false
-  
+  # Run as root (in-container uid 0 -> host uid 1000) so the serversideup
+  # entrypoint can write /etc/nginx/nginx.conf at startup (image ships it
+  # root-owned; the image-default www-data user can't -> EACCES crash-loop).
+  # Workers are dropped to www-data internally by the entrypoint.
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+
   # Init container - solo crea struttura
   initContainers:
   - name: init-storage
