@@ -30,6 +30,13 @@ MAX_BACKUPS_PER_SERVICE=3
 OFFSITE_BACKUP_DIR="/mnt/immich_storage/Full_VPS_Backups"
 OFFSITE_LIMIT=5
 
+# Lower CPU + IO scheduling priority for backup-heavy ops (gzip/tar/rsync) so
+# the nightly backup doesn't starve foreground services. Without this the
+# backup spiked the 2-core host to load ~6 and tripped Uptime Kuma's load
+# alert. nice 19 = lowest CPU prio; ionice c2 n7 = best-effort lowest IO prio
+# (not 'idle' c3, which could stall the backup indefinitely under IO contention).
+NICE_CMD="nice -n 19 ionice -c2 -n7"
+
 # S3 Backup Configuration (Garage) - credentials loaded from .env
 S3_ENDPOINT="${GARAGE_S3_ENDPOINT:-http://localhost:3900}"
 S3_BUCKET="${GARAGE_S3_BUCKET:-backups}"
@@ -72,7 +79,7 @@ success() { echo -e "${C_GREEN}[SUCCESS] $1${C_RESET}"; }
 title()   { echo -e "\n${C_BLUE}=== $1 ===${C_RESET}"; }
 
 check_dependencies() {
-  for cmd in rsync podman systemctl gzip find sort stat id; do
+  for cmd in rsync podman systemctl gzip find sort stat id nice ionice; do
     if ! command -v "$cmd" &>/dev/null; then
       error "'$cmd' is not installed. Please install it."
       exit 1
@@ -271,7 +278,7 @@ sync_to_cloud() {
     
     nohup bash -c "
       echo 'Creating compressed archive...' >> '$log_file'
-      tar -czf '$tar_file' -C '$(dirname "$backup_path")' '$backup_name' 2>> '$log_file'
+      $NICE_CMD tar -czf '$tar_file' -C '$(dirname "$backup_path")' '$backup_name' 2>> '$log_file'
       
       echo 'Uploading to S3...' >> '$log_file'
       
@@ -322,7 +329,7 @@ sync_to_cloud() {
     info "Progress log: $log_file"
     
     nohup bash -c "
-      rsync -a --info=progress2 '$backup_path' '$OFFSITE_BACKUP_DIR/' >> '$log_file' 2>&1
+      $NICE_CMD rsync -a --info=progress2 '$backup_path' '$OFFSITE_BACKUP_DIR/' >> '$log_file' 2>&1
       
       # Rotate old offsite backups after sync completes
       backup_pattern='${service_name}_backup_'
@@ -391,7 +398,7 @@ backup_immich() {
   fi
 
   info "Dumping Database (Compressed)..."
-  if podman exec -i "$POSTGRES_CONTAINER" pg_dumpall -U "$db_user" | gzip > "$backup_dir/database.sql.gz"; then
+  if podman exec -i "$POSTGRES_CONTAINER" pg_dumpall -U "$db_user" | $NICE_CMD gzip > "$backup_dir/database.sql.gz"; then
     success "Database dumped successfully."
   else
     error "Database dump failed."
@@ -402,7 +409,7 @@ backup_immich() {
   local IMMICH_ML_CACHE="$PODMAN_SETUP_DIR/data/immich/immich_model_cache"
   if [ -d "$IMMICH_ML_CACHE" ]; then
     info "Backing up ML Model Cache..."
-    rsync -a --info=progress2 "$IMMICH_ML_CACHE/" "$backup_dir/ml_cache/" && \
+    $NICE_CMD rsync -a --info=progress2 "$IMMICH_ML_CACHE/" "$backup_dir/ml_cache/" && \
       success "ML cache backed up."
   else
     info "Skipping ML cache backup (directory doesn't exist)."
@@ -446,7 +453,7 @@ backup_firefly() {
   db_name="$(podman exec "$DB_CONTAINER" printenv MYSQL_DATABASE | tr -d '\r')"
 
   info "Dumping Database (Compressed)..."
-  if podman exec -i "$DB_CONTAINER" sh -c "mariadb-dump -h 127.0.0.1 -u $db_user -p\$MYSQL_PASSWORD $db_name" | gzip > "$backup_dir/firefly_database.sql.gz"; then
+  if podman exec -i "$DB_CONTAINER" sh -c "mariadb-dump -h 127.0.0.1 -u $db_user -p\$MYSQL_PASSWORD $db_name" | $NICE_CMD gzip > "$backup_dir/firefly_database.sql.gz"; then
     success "Database dumped successfully."
   else
     error "Database dump failed."
@@ -454,7 +461,7 @@ backup_firefly() {
   fi
 
   info "Backing up Data Files (excluding db - already dumped via SQL)..."
-  rsync -a --info=progress2 --exclude='db/' --exclude='storage/oauth-*.key' "$FIREFLY_DATA_DIR/" "$backup_dir/data/" && \
+  $NICE_CMD rsync -a --info=progress2 --exclude='db/' --exclude='storage/oauth-*.key' "$FIREFLY_DATA_DIR/" "$backup_dir/data/" && \
     success "Firefly III backup complete!"
     
   sync_to_cloud "firefly" "$backup_dir"
@@ -488,7 +495,7 @@ backup_uptime_kuma() {
   fi
 
   info "Backing up Data Files..."
-  rsync -a --info=progress2 "$KUMA_DATA_DIR/" "$backup_dir/data/" && \
+  $NICE_CMD rsync -a --info=progress2 "$KUMA_DATA_DIR/" "$backup_dir/data/" && \
     success "Uptime Kuma backup complete!"
 
   # Cleanup the in-container snapshot after rsync has copied it out.
@@ -512,7 +519,7 @@ backup_portainer() {
   rotate_backups "portainer"
   mkdir -p "$backup_dir"
   info "Backing up Data Files..."
-  rsync -a --info=progress2 "$PORTAINER_DATA_DIR/" "$backup_dir/data/" && \
+  $NICE_CMD rsync -a --info=progress2 "$PORTAINER_DATA_DIR/" "$backup_dir/data/" && \
     success "Portainer backup complete!"
     
   sync_to_cloud "portainer" "$backup_dir"
@@ -530,7 +537,7 @@ backup_ntfy() {
   rotate_backups "ntfy"
   mkdir -p "$backup_dir"
   info "Backing up Data Files..."
-  rsync -a --info=progress2 "$NTFY_DATA_DIR/" "$backup_dir/data/" && \
+  $NICE_CMD rsync -a --info=progress2 "$NTFY_DATA_DIR/" "$backup_dir/data/" && \
     success "ntfy backup complete!"
 
   sync_to_cloud "ntfy" "$backup_dir"
@@ -551,7 +558,7 @@ backup_caddy() {
   rotate_backups "caddy"
   mkdir -p "$backup_dir"
   info "Backing up Caddyfile and ACME state..."
-  rsync -a --info=progress2 "$CADDY_DATA_DIR/" "$backup_dir/data/" && \
+  $NICE_CMD rsync -a --info=progress2 "$CADDY_DATA_DIR/" "$backup_dir/data/" && \
     success "Caddy backup complete!"
 
   sync_to_cloud "caddy" "$backup_dir"
@@ -570,7 +577,7 @@ backup_metabase() {
   mkdir -p "$backup_dir"
   info "Backing up Metabase H2 Database and config..."
   # Metabase uses H2 embedded DB - just copy the data files
-  rsync -a --info=progress2 "$METABASE_DATA_DIR/" "$backup_dir/data/" && \
+  $NICE_CMD rsync -a --info=progress2 "$METABASE_DATA_DIR/" "$backup_dir/data/" && \
     success "Metabase backup complete!"
     
   sync_to_cloud "metabase" "$backup_dir"

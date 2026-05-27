@@ -143,6 +143,11 @@ La modalità `--backup-all` (non-interattiva) esegue in sequenza:
 > Servizi dismessi (Metabase, Actual Budget) non sono nel ciclo; i loro dati
 > restano in `data/<servizio>/` ma il container non viene avviato.
 
+> **Priorità ridotta:** tutte le operazioni pesanti del backup (`tar`, `gzip`,
+> `rsync`) girano con `nice -n 19 ionice -c2 -n7` (variabile `NICE_CMD`). Su 2
+> core il backup notturno spingeva il load a ~6, facendo scattare l'alert load
+> di Uptime Kuma; con la priorità bassa cede CPU/IO ai servizi in foreground.
+
 ### Manutenzione DB settimanale
 
 Ogni **domenica alle 04:30** parte `scripts/weekly_db_optimize.sh` (cron) che
