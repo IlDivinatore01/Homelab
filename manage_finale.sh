@@ -196,34 +196,41 @@ NetworkName=services_net
 EOF
   fi
 
-  # Create Service Quadlets
-  for svc in "${!PODS[@]}"; do
+  # Create Service Quadlets. Startup is SERIALIZED via an After= chain (each
+  # pod starts after the previous one) iterating SERVICES in order. Reason:
+  # at boot ~12 pods running 'podman kube play' concurrently contend on
+  # podman's sqlite state DB; the losers get SIGKILLed at the systemd start
+  # timeout mid-play, leaving half-created (wedged) pods AND corrupting the
+  # state DB (pod ps/rm then hang). Serializing + a 5min TimeoutStartSec
+  # eliminates the contention. (See docs/ARCHITETTURA + the 2026-05 recovery.)
+  local prev=""
+  for svc in "${SERVICES[@]}"; do
     local kube_file="$systemd_dir/$svc.kube"
     local yaml_path="${PODS[$svc]}"
-    
+    local after_chain="After=network-online.target"
+    [ -n "$prev" ] && after_chain="After=network-online.target
+After=$prev.service"
+
     if [ ! -f "$kube_file" ]; then
-      info "Bootstrapping $svc.kube..."
+      info "Bootstrapping $svc.kube (after: ${prev:-network})..."
       cat > "$kube_file" <<EOF
 [Unit]
 Description=Auto-start for ${svc^} Pod
 Wants=network-online.target
-After=network-online.target
+$after_chain
 
 [Kube]
 Yaml=$yaml_path
 Network=services_net
 
 [Service]
-# At boot ~12 pods run 'podman kube play' concurrently and contend on
-# podman's sqlite state DB. With the default 90s start timeout, the slow
-# ones get SIGKILLed mid-kube-play, leaving a half-created (wedged) pod
-# that then hangs podman. 5 min lets each play finish under contention.
 TimeoutStartSec=300
 
 [Install]
 WantedBy=default.target
 EOF
     fi
+    prev="$svc"
   done
   
   # Reload systemd to pick up new files
