@@ -50,14 +50,23 @@ cd ~
 git clone https://forgejo.it/simonemiglio/Homelab.git podman
 cd podman
 
-# 2. Clone website source (if needed)
+# 2. Clone website source as a SUBFOLDER (if needed)
 git clone https://forgejo.it/simonemiglio/Website.git site_sources
 
-# 3. Clone FastFood source (if needed)
+# 3. Clone FastFood source as a SUBFOLDER (if needed)
 git clone https://forgejo.it/simonemiglio/FastFood.git FastFood
 ```
 
-> **Note:** Each repo is independent. You can run FastFood standalone without Homelab by following its own README.
+> **Why subfolders, not siblings?** `manage.sh`'s `build_site()` and
+> `build_fastfood()` reference the build contexts as `./site_sources` and
+> `./FastFood` (relative to the Homelab checkout). Both directories are
+> gitignored from this repo so each project keeps its own git history. If
+> you don't host the portfolio or FastFood, simply skip the respective clone
+> — the build-related menu entries in `manage.sh` will just stop after a
+> "source dir missing" error.
+>
+> Each repo also works **standalone** — you can run FastFood by itself by
+> following its own README without ever cloning Homelab.
 
 ---
 
@@ -182,18 +191,25 @@ Add these A records pointing to your server IP:
 
 ## 🔧 Step 6: Install Quadlet Services
 
+The `*.kube` (one per service) and `*.network` units that drive systemd live
+under [`quadlets/`](quadlets/) in this repo. `manage.sh` installs them into
+`~/.config/containers/systemd/` and runs `daemon-reload`:
+
 ```bash
-# Create systemd user directory
-mkdir -p ~/.config/containers/systemd
+./manage.sh
+# → option 11 "Setup & Verify Quadlet Config"
+```
 
-# Copy Quadlet files (if you have them)
-# Or they should be in ~/.config/containers/systemd/ already
+That option copies any file in `quadlets/` that has drifted vs the live dir,
+then runs `systemctl --user daemon-reload`. After the first install you only
+re-run it when you edit something under `quadlets/`. See
+[quadlets/README.md](quadlets/README.md) for the boot chain and trust-zone
+conventions.
 
-# Reload systemd
-systemctl --user daemon-reload
+Also install the post-reboot permission fix once:
 
-# Enable permission fix service
-./setup_permission_fix.sh
+```bash
+./scripts/setup_permission_fix.sh
 ```
 
 ---
@@ -285,17 +301,34 @@ Garage provides S3-compatible storage using your Hetzner Storage Box.
 
 ### 8b.1 Setup Garage
 
-```bash
-# Copy example config
-cp config_examples/garage.pod.yaml.example kube_yaml/garage.pod.yaml
+`kube_yaml/garage.pod.yaml` ships in the repo with no plaintext credentials —
+the WebUI `admin` user:bcrypt-hash is sourced from a podman secret named
+`garage-webui-auth`, so you set it up out-of-band:
 
-# Generate WebUI authentication hash
+```bash
+# Generate the WebUI admin credentials
 sudo apt install -y apache2-utils
 htpasswd -nbBC 10 "admin" "YOUR_PASSWORD"
+# → admin:$2y$10$.....
 
-# Edit garage.pod.yaml and replace AUTH_USER_PASS value with the generated hash
-nano kube_yaml/garage.pod.yaml
+# Wrap in a K8s Secret YAML (file-driver podman secrets need this shape)
+cat > /tmp/garage-webui-auth.yaml <<'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: garage-webui-auth
+stringData:
+  userpass: admin:$2y$10$.....   # paste the full htpasswd output here
+type: Opaque
+EOF
+
+podman secret create garage-webui-auth /tmp/garage-webui-auth.yaml
+rm -f /tmp/garage-webui-auth.yaml
 ```
+
+The pod YAML reads it as `secretKeyRef: { name: garage-webui-auth, key: userpass }`.
+If you skip this, the webui container will refuse to start with a
+`secret ... is not valid JSON/YAML` error.
 
 ### 8b.2 Start Garage
 

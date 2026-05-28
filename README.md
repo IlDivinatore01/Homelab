@@ -46,110 +46,64 @@ Self-hosted infrastructure running on Podman with Systemd Quadlet integration.
 
 | Service | Reason |
 |---------|--------|
-| **Metabase** | No longer used. Data preserved in `data/metabase/`. To re-enable: rename `kube_yaml/metabase.pod.yaml.disabilitato` and re-add to `manage.sh`. |
-| **Actual Budget** | No longer used. Data preserved in `data/actual/`. Same re-enable procedure. |
+| **Metabase** | No longer used. Pod YAML in `kube_yaml/disabled/`. Data preserved in `data/metabase/`. See [kube_yaml/disabled/README.md](kube_yaml/disabled/README.md) for the re-enable recipe. |
+| **Actual Budget** | No longer used. Pod YAML in `kube_yaml/disabled/`. Data preserved in `data/actual/`. |
 | **Immich Machine Learning** | Sub-container commented out in `kube_yaml/immich.pod.yaml` to free ~170MB RAM (Smart Search / Faces / OCR unused). Image + model cache kept on disk. Re-enable: uncomment the block + restart + flip the ML toggles in Immich admin UI. |
 
 ---
 
 ## 🚀 Quick Start
 
-> **Full setup guide:** See [SETUP.md](SETUP.md) for complete instructions.
-
-### Prerequisites
-
-- Ubuntu 24.04 LTS (or similar)
-- 2+ vCPU, 4+ GB RAM
-- Domain with DNS access
-
-### Step 1: Clone Repositories
-
-This setup uses **3 independent repositories**:
+First-time install: follow [SETUP.md](SETUP.md) end-to-end. The short
+version:
 
 ```bash
-cd ~
-
-# Infrastructure (required)
-git clone https://forgejo.it/simonemiglio/Homelab.git podman
-cd podman
-
-# Portfolio source (if needed)
-git clone https://forgejo.it/simonemiglio/Website.git site_sources
-
-# FastFood source (if needed)
-git clone https://forgejo.it/simonemiglio/FastFood.git FastFood
-```
-
-### Step 2: Create Secrets
-
-```bash
-./scripts/create_secrets.sh
-```
-
-### Step 3: Configure environment file
-
-```bash
-cp .env.example .env
-chmod 600 .env
-# Fill in GARAGE_S3_ACCESS_KEY / GARAGE_S3_SECRET_KEY (see SETUP.md §3.2)
-```
-
-### Step 4: Configure Caddy
-
-```bash
+git clone https://forgejo.it/simonemiglio/Homelab.git ~/podman
+cd ~/podman
+./scripts/create_secrets.sh        # podman secrets
+cp .env.example .env && chmod 600 .env  # host env (S3, ntfy)
 cp config_examples/Caddyfile.example data/caddy/Caddyfile
-# Edit with your domain
+./manage.sh                        # option 11 (verify quadlets) → 1 (start)
 ```
 
-### Step 5: Start Services
-
-```bash
-./manage.sh
-# Select option 1, then 'a' for all
-```
+Website and FastFood live in sibling subfolders (`site_sources/` and
+`FastFood/`) — see [SETUP.md Step 2](SETUP.md).
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-Internet (HTTPS)
-       │
-       ▼
-┌─────────────────────────────────────────────┐
-│  Caddy (Port 80/443)                        │
-│  Reverse Proxy + Auto HTTPS                 │
-└─────────────────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────────┐
-│  services_net (Podman Network)              │
-│                                             │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
-│  │Homepage │ │ Immich  │ │Firefly  │       │
-│  │   Pod   │ │   Pod   │ │   Pod   │       │
-│  └─────────┘ └─────────┘ └─────────┘       │
-│                                             │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
-│  │Metabase │ │FastFood │ │ Uptime  │       │
-│  │   Pod   │ │   Pod   │ │  Kuma   │       │
-│  └─────────┘ └─────────┘ └─────────┘       │
-│                                             │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐       │
-│  │IT-Tools │ │ Garage  │ │  ntfy   │       │
-│  │   Pod   │ │   Pod   │ │   Pod   │       │
-│  └─────────┘ └─────────┘ └─────────┘       │
-└─────────────────────────────────────────────┘
+                       Internet (HTTPS)
+                              │
+                              ▼
+                ┌──────────────────────────┐
+                │   Caddy  (80 / 443)      │  reverse proxy + auto-HTTPS
+                └────────┬───────────┬─────┘    (only pod multi-homed)
+                         │           │
+              services_net│           │sensitive_net
+              10.89.0.0/24│           │10.89.2.0/24
+                         ▼           ▼
+        ┌────────────────────┐  ┌────────────────────┐
+        │ homepage, site,    │  │ firefly,           │
+        │ uptime-kuma, ntfy, │  │ firefly-importer,  │
+        │ portainer, garage, │  │ immich             │
+        │ it-tools, fastfood │  │ (data crown jewels)│
+        └────────────────────┘  └────────────────────┘
 ```
 
-### Key Concepts
+Pods on `services_net` cannot reach the DBs on `sensitive_net` — Caddy is the
+only bridge. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the boot
+chain, Quadlets and conventions.
 
-| Component | Purpose |
-|-----------|---------|
-| **Rootless Podman** | Containers run as user, not root |
-| **Quadlets** | Systemd integration for auto-start |
-| **Caddy** | Automatic HTTPS with Let's Encrypt |
-| **services_net** | Internal DNS between pods |
+### Key concepts
+
+| Component         | Purpose                                                                  |
+|-------------------|--------------------------------------------------------------------------|
+| Rootless Podman   | Containers run as the `osvaldo` user, never root                         |
+| Quadlets          | systemd integration — every pod is a `<svc>.service` (auto-restart, boot ordering) |
+| Caddy             | Single reverse proxy, automatic Let's Encrypt certs, bridges trust zones |
+| Two-zone network  | `services_net` (general) + `sensitive_net` (Firefly + Immich)            |
 
 ---
 
@@ -157,52 +111,25 @@ Internet (HTTPS)
 
 ```
 podman/
-├── kube_yaml/               # Pod definitions
-│   ├── caddy.pod.yaml
-│   ├── homepage.pod.yaml
-│   ├── site.pod.yaml        # Portfolio website
-│   ├── immich.pod.yaml
-│   ├── firefly.pod.yaml
-│   ├── firefly-importer.pod.yaml  # Bank data importer
-│   ├── metabase.pod.yaml    # Financial analytics dashboard
-│   ├── actual.pod.yaml      # Actual Budget
-│   ├── fastfood.pod.yaml
-│   ├── uptime-kuma.pod.yaml
-│   ├── portainer.pod.yaml
-│   ├── garage.pod.yaml      # Gitignored (contains auth hash)
-│   ├── ntfy.pod.yaml          # Push notification server
-│   └── it-tools.pod.yaml
-│
-├── config_examples/         # Configuration templates
-│   ├── Caddyfile.example
-│   ├── garage.pod.yaml.example
-│   └── services.yaml.example
-│
-├── scripts/                 # Utility scripts
-│   ├── create_secrets.sh    # Idempotent Podman + k8s secrets setup
-│   ├── nightly_backup.sh    # Automated nightly backups (cron 03:00)
-│   ├── weekly_db_optimize.sh    # VACUUM + mariadb-check (cron Sun 04:30)
-│   ├── healthcheck_monitor.sh   # Watches livenessProbe state (cron */5)
-│   ├── kuma_system_push.sh      # Push mem/load/disk heartbeats to Uptime Kuma
-│   ├── lib_notify.sh        # Tiny ntfy helper sourced by the cron scripts
-│   ├── restore_wizard.sh    # Restore from local/S3 + --verify dry-run
-│   ├── setup_permission_fix.sh  # Fix volume permissions after reboot
-│   ├── setup_fail2ban.sh    # SSH brute-force protection (one-shot)
-│   ├── setup_fail2ban_caddy.sh  # fail2ban jail for Caddy logins (one-shot, sudo)
-│   ├── fail2ban/            # filter+jail files installed by the script above
-│   └── setup_cockpit.sh     # Install Cockpit web UI
-│
-├── logs/                    # Backup logs (auto-created)
-│
-├── docs/                    # Additional documentation
-│   ├── ARCHITETTURA.md      # Architecture (Italian)
-│   └── metabase_queries.md  # SQL queries for Metabase dashboards
-│
-├── manage.sh         # Main management script
-├── .env                     # Gitignored - host secrets (S3 creds, etc.)
-├── .env.example             # Template for .env
+├── kube_yaml/               # Pod definitions (one *.pod.yaml per service)
+│   └── disabled/            # Pods kept on disk but not started
+├── quadlets/                # Source-of-truth *.kube / *.network units
+│                            #   (installed into ~/.config/containers/systemd/
+│                            #    by manage.sh → bootstrap_quadlets)
+├── config_examples/         # Caddyfile + homepage services.yaml templates
+├── podman_secrets/          # K8s Secret YAMLs for create_secrets.sh (gitignored)
+├── scripts/                 # cron-driven ops (see Management section below)
+├── data/                    # persistent app data (gitignored)
+├── backups/                 # local backup dumps, rotated per service (gitignored)
+├── logs/                    # cron script logs, rotated per script (gitignored)
+├── state/                   # runtime state (e.g. healthcheck flap protection) (gitignored)
+├── docs/
+│   ├── ARCHITECTURE.md      # How it runs at boot and runtime
+│   ├── kuma_setup.md        # Uptime Kuma monitor / push / ntfy setup
+│   └── metabase_queries.md  # SQL for Metabase dashboards (service disabled)
+├── manage.sh                # Main management script (menu + --flag mode)
 ├── README.md                # This file
-└── SETUP.md                 # Full setup guide
+└── SETUP.md                 # First-install guide
 ```
 
 ### Related Repositories
@@ -312,44 +239,18 @@ journalctl --user -u caddy.service -f
 
 ## 🆘 Troubleshooting
 
-### Permission Errors
+Full troubleshooting recipes (permissions, 502, won't-start) live in
+[SETUP.md → Troubleshooting](SETUP.md#-troubleshooting). Quick pointers:
 
 ```bash
-# Run the permission fix
-./scripts/setup_permission_fix.sh
+# Pod / container state
+podman pod ps && podman ps
 
-# Or manually:
-sudo chown -R $USER:$USER /mnt/HC_Volume_*/podman-root
-```
+# Service logs
+journalctl --user -u <svc>.service -n 50
+podman logs <container>
 
-### 502 Bad Gateway
-
-```bash
-# Check if pod is running
-podman pod ps
-
-# Restart Caddy
-systemctl --user restart caddy.service
-
-# Check network DNS
-podman exec caddy-pod-caddy getent hosts <pod-name>
-```
-
-### Service Won't Start
-
-```bash
-# Check systemd logs
-journalctl --user -u <service>.service -n 50
-
-# Check container logs
-podman logs <container-name>
-```
-
-### After Reboot Issues
-
-The `fix-podman-permissions.service` runs automatically. If issues persist:
-
-```bash
+# Permission fix after a reboot
 ./scripts/setup_permission_fix.sh
 ```
 
@@ -359,9 +260,11 @@ The `fix-podman-permissions.service` runs automatically. If issues persist:
 
 | Document | Description |
 |----------|-------------|
-| [SETUP.md](SETUP.md) | Complete setup guide |
-| [docs/ARCHITETTURA.md](docs/ARCHITETTURA.md) | Architecture details (Italian) |
-| [docs/kuma_setup.md](docs/kuma_setup.md) | Uptime Kuma advanced setup (monitors, ntfy, tags, push checks) |
+| [SETUP.md](SETUP.md) | First-install guide (deps, DNS, secrets, backups, security) |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the system runs at boot and runtime (Quadlets, networks, backups) |
+| [docs/kuma_setup.md](docs/kuma_setup.md) | Uptime Kuma advanced setup — monitors, push checks, ntfy notifications |
+| [quadlets/README.md](quadlets/README.md) | Conventions encoded in every `.kube` (boot chain, trust zones, timeouts) |
+| [kube_yaml/disabled/README.md](kube_yaml/disabled/README.md) | Re-enable recipe for shelved services |
 
 ---
 

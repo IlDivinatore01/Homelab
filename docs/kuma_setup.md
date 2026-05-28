@@ -1,38 +1,41 @@
-# 📡 Uptime Kuma — Setup avanzato
+# 📡 Uptime Kuma — Advanced setup
 
-Checklist per portare Kuma da "qualche monitor base" a un sistema completo con
-ntfy, SSL expiry, tag, status page raggruppata e push checks di sistema.
+Checklist that takes Kuma from "a few basic monitors" to a complete setup
+with ntfy, SSL-expiry alerts, tag-based grouping on the public status page,
+and system push checks.
 
-Tutto quello che segue si fa dalla UI: <https://status.simonemiglio.eu>.
+Everything below is done through the UI: <https://status.simonemiglio.eu>.
 
 ---
 
-## 1. Aggiungere i monitor mancanti
+## 1. Add the missing monitors
 
-| Nome | Type | URL | Interval | Note |
+| Name | Type | URL | Interval | Notes |
 |---|---|---|---|---|
 | Garage WebUI | HTTP(s) | `https://garage.simonemiglio.eu` | 60s | |
 | IT Tools | HTTP(s) | `https://tools.simonemiglio.eu` | 60s | |
-| ntfy | HTTP(s) | `https://notify.simonemiglio.eu/v1/health` | 60s | endpoint health nativo |
+| ntfy | HTTP(s) | `https://notify.simonemiglio.eu/v1/health` | 60s | native health endpoint |
 | FastFood | HTTP(s) | `https://fastfood.simonemiglio.eu` | 60s | |
-| Cockpit | HTTP(s) | `https://panel.simonemiglio.eu` | 120s | **Spuntare** "Ignore TLS error" (self-signed) |
+| Cockpit | HTTP(s) | `https://panel.simonemiglio.eu` | 120s | **Tick** "Ignore TLS error" (self-signed) |
 
-Per ogni nuovo monitor, espandi **Advanced** e:
+For every new monitor expand **Advanced** and set:
 
-- ✅ **Certificate Expiry Notification** (Kuma avvisa 21 / 14 / 7 giorni prima della scadenza)
+- ✅ **Certificate Expiry Notification** (Kuma warns 21 / 14 / 7 days before expiry)
 - ✅ **Authentication: None**
-- **Retries**: `2`
-- **Heartbeat Retry Interval**: `60s`
+- **Retries:** `2`
+- **Heartbeat Retry Interval:** `60s`
 
-> Stessa cosa va fatta **anche sui 6 monitor esistenti** (Portfolio, Immich, Firefly, Importer, Homepage, Portainer): aprili in modifica e spunta "Certificate Expiry Notification". Non serve toccare l'URL.
+> Do the same for the **6 pre-existing monitors** (Portfolio, Immich, Firefly,
+> Importer, Homepage, Portainer): open each in edit mode and tick "Certificate
+> Expiry Notification". No need to touch the URL.
 
 ---
 
-## 2. Aggiungere ntfy come notifica
+## 2. Add ntfy as a notification channel
 
 **Settings → Notifications → Setup Notification**:
 
-| Campo | Valore |
+| Field | Value |
 |---|---|
 | Notification Type | `Ntfy` |
 | Friendly Name | `ntfy homelab-alerts` |
@@ -40,144 +43,148 @@ Per ogni nuovo monitor, espandi **Advanced** e:
 | Server URL | `https://notify.simonemiglio.eu` |
 | Priority | `Default (3)` |
 | Authentication Method | `Access Token` |
-| Access Token | (incolla `NTFY_TOKEN` dal `.env` — `tk_...`) |
-| **Default enabled** | ✅ (spunta — così si applica ai monitor nuovi automaticamente) |
-| **Apply on all existing monitors** | ✅ (spunta una volta — applica anche ai 9 monitor già presenti) |
+| Access Token | paste `NTFY_TOKEN` from `.env` (`tk_...`) |
+| **Default enabled** | ✅ (so it auto-applies to new monitors) |
+| **Apply on all existing monitors** | ✅ (one-time, applies to the 9 existing monitors) |
 
-→ **Save**. Tieni anche Telegram come canale di backup, ridondanza nelle alert.
+→ **Save**. Keep Telegram around as a redundant alert channel.
 
-Test rapido: dalla riga del provider clicca **Test** → arriva una notifica sul tuo telefono.
+Quick test: in the provider row click **Test** → a notification should land on
+your phone.
 
 ---
 
-## 3. Creare i tag
+## 3. Create the tags
 
-**Settings → Tags → New Tag** (4 tag):
+**Settings → Tags → New Tag** (4 tags):
 
-| Nome | Colore |
+| Name | Colour |
 |---|---|
-| `frontend` | `#10b981` (verde) |
-| `backend` | `#3b82f6` (blu) |
-| `infra` | `#f59e0b` (ambra) |
-| `sistema` | `#8b5cf6` (viola) |
+| `frontend` | `#10b981` (green) |
+| `backend`  | `#3b82f6` (blue) |
+| `infra`    | `#f59e0b` (amber) |
+| `system`   | `#8b5cf6` (purple) |
 
-Poi assegna ai monitor (apri ogni monitor → **Tags** → aggiungi):
+Then assign tags to monitors (open each monitor → **Tags** → add):
 
-| Tag | Monitor |
+| Tag | Monitors |
 |---|---|
 | `frontend` | Portfolio, FastFood, Homepage |
-| `backend` | Firefly III, Firefly Importer, Immich, json-query Immich |
-| `infra` | Portainer, Caddy (se aggiunto), Cockpit, IT Tools, Garage WebUI |
-| `sistema` | ntfy, Disk /, Disk /mnt/HC_*, Memory %, Load 5min (i 2 push li crei al §5) |
+| `backend`  | Firefly III, Firefly Importer, Immich, json-query Immich |
+| `infra`    | Portainer, Caddy (if added), Cockpit, IT Tools, Garage WebUI |
+| `system`   | ntfy, Disk /, Disk /mnt/HC_*, Memory %, Load 5min (the 2 push monitors from §5) |
 
 ---
 
-## 4. Ristrutturare la status page
+## 4. Restructure the public status page
 
 **Status Pages → Status Services → Edit**:
 
-- **Title**: `Homelab Status`
-- **Description**: `Stato dei servizi self-hosted`
-- **Footer Text**: `Powered by Uptime Kuma`
-- **Theme**: Dark
+- **Title:** `Homelab Status`
+- **Description:** `Self-hosted services status`
+- **Footer Text:** `Powered by Uptime Kuma`
+- **Theme:** Dark
 - ✅ **Show certificate expiry**
-- ✅ **Show powered by** (a piacere)
+- ✅ **Show powered by** (optional)
 
-**Add a Group** per ogni tag:
+**Add a Group** per tag:
 
-1. `🌐 Frontend` → seleziona monitor con tag `frontend`
+1. `🌐 Frontend` → select monitors tagged `frontend`
 2. `⚙️ Backend` → tag `backend`
-3. `🛠️ Infrastruttura` → tag `infra`
-4. `📊 Sistema` → tag `sistema`
+3. `🛠️ Infrastructure` → tag `infra`
+4. `📊 System` → tag `system`
 
-**Save** → la pagina pubblica `https://status.simonemiglio.eu/status` ora mostra i servizi raggruppati per categoria.
+**Save** → the public page at `https://status.simonemiglio.eu/status` now
+shows services grouped by category.
 
 ---
 
-## 5. Push checks: memoria + load average
+## 5. Push checks: memory + load average
 
-In Kuma crea **2 monitor di tipo Push**:
+Create **2 Push-type monitors** in Kuma:
 
-| Nome | Type | Heartbeat Interval | Retries | Tag |
+| Name | Type | Heartbeat Interval | Retries | Tag |
 |---|---|---|---|---|
-| `Memory %` | Push | `600s` | `1` | `sistema` |
-| `Load 5min` | Push | `600s` | `1` | `sistema` |
+| `Memory %`  | Push | `600s` | `1` | `system` |
+| `Load 5min` | Push | `600s` | `1` | `system` |
 
-> ⚠️ **Heartbeat Interval va impostato a 600s anche se il cron gira ogni 5 min (300s).**
-> Se la finestra Kuma = periodo del cron, il jitter del cron (un beat che arriva
-> a 302s invece di 300s) fa scattare falsi "No heartbeat in the time window".
-> Con finestra 600s servono **due** push saltati di fila per un vero allarme —
-> i falsi spariscono e una vera interruzione viene comunque rilevata in ~10 min.
-> Stessa cosa vale per i 2 push disk esistenti (portali a 600s).
+> ⚠️ **Set Heartbeat Interval to 600 s even though the cron runs every 5 min
+> (300 s).** When the Kuma window equals the cron period, cron jitter (a beat
+> arriving at 302 s instead of 300 s) trips false "No heartbeat in the time
+> window" alarms. With a 600 s window you need **two** missed pushes in a row
+> to alert — false positives disappear and a real outage is still caught in
+> ~10 min. Apply the same fix to the 2 pre-existing disk push monitors.
 
-Per ognuno, Kuma genera un URL del tipo:
+For each monitor Kuma generates an URL like:
 
 ```
 https://status.simonemiglio.eu/api/push/<TOKEN>?status=up&msg=OK&ping=
 ```
 
-Copia i due URL e aggiungili al crontab:
+Copy both URLs and add them to crontab:
 
 ```bash
 crontab -e
 ```
 
-Aggiungi (sostituendo i `<TOKEN>` con quelli reali):
+Add (replace `<TOKEN_MEM>` and `<TOKEN_LOAD>` with the real ones):
 
 ```cron
-# Uptime Kuma — push memoria (warn 80%, crit 95%)
+# Uptime Kuma — memory push (warn 80 %, crit 95 %)
 */5 * * * * /home/osvaldo/podman/scripts/kuma_system_push.sh mem 80 95 "https://status.simonemiglio.eu/api/push/<TOKEN_MEM>"
 
-# Uptime Kuma — push load 5min (warn 200 = load 2.0, crit 400 = load 4.0 — 2 core)
+# Uptime Kuma — load 5min push (warn 200 = load 2.0, crit 400 = load 4.0 — 2 cores)
 */5 * * * * /home/osvaldo/podman/scripts/kuma_system_push.sh load 200 400 "https://status.simonemiglio.eu/api/push/<TOKEN_LOAD>"
 ```
 
-Lo script `scripts/kuma_system_push.sh` (già nel repo) emette il valore nel campo `ping=` così Kuma lo grafica nel tempo. Soglie WARN passano il messaggio ma lasciano `status=up`; soglie CRIT mandano `status=down` → trigger notifiche.
+`scripts/kuma_system_push.sh` emits the value in the `ping=` field so Kuma
+graphs it over time. WARN thresholds keep `status=up`; CRIT thresholds send
+`status=down` → triggers notifications.
 
-Test manuale prima di aggiungere a cron:
+Manual test before adding to cron:
 
 ```bash
-./scripts/kuma_system_push.sh mem  80 95 "https://status.simonemiglio.eu/api/push/<TOKEN_MEM>"
+./scripts/kuma_system_push.sh mem  80 95  "https://status.simonemiglio.eu/api/push/<TOKEN_MEM>"
 ./scripts/kuma_system_push.sh load 200 400 "https://status.simonemiglio.eu/api/push/<TOKEN_LOAD>"
 ```
 
-→ Dopo 5 secondi il monitor in Kuma deve diventare verde con il valore corrente.
+→ After ~5 s the Kuma monitor turns green with the current value.
 
 ---
 
-## 6. Verifica finale
+## 6. Final verification
 
 ```bash
-# Quanti monitor attivi totali
+# Total active monitors
 podman exec uptime-kuma-pod-uptime-kuma sqlite3 /app/data/kuma.db \
   "SELECT COUNT(*) FROM monitor WHERE active=1"
-# Atteso: 16 (9 esistenti + 5 HTTP nuovi + 2 push)
+# Expected: 16 (9 pre-existing + 5 new HTTP + 2 push)
 
-# Verifica notifiche assegnate
+# Notifications assigned per monitor
 podman exec uptime-kuma-pod-uptime-kuma sqlite3 /app/data/kuma.db \
   "SELECT m.name, n.name FROM monitor m
    JOIN monitor_notification mn ON mn.monitor_id=m.id
    JOIN notification n ON n.id=mn.notification_id
    ORDER BY m.name"
-# Ogni monitor deve comparire con Telegram + ntfy.
+# Every monitor should appear with both Telegram and ntfy.
 ```
 
 ---
 
-## 7. Backup robusto (già automatico)
+## 7. Robust backup (already automated)
 
-`manage.sh` ora prende un **snapshot atomico SQLite** (`.backup`) prima
-del rsync del data dir. Questo evita backup corrotti se Kuma sta scrivendo
-mentre parte il backup notturno. Niente da fare lato utente — è già attivo dal
-prossimo run di `--backup-all` o `--backup uptime-kuma`.
+`manage.sh` takes an **atomic SQLite snapshot** (`.backup`) before rsyncing
+the data dir. This prevents corrupt backups when Kuma is writing during the
+nightly run. Nothing to do on the user side — it's active on the next run of
+`--backup-all` or `--backup uptime-kuma`.
 
-Verifica al primo run:
+Verify on the first run:
 
 ```bash
 ./manage.sh --backup uptime-kuma
-# Cerca "Snapshot created." nel log
+# Look for "Snapshot created." in the log
 ls -la backups/uptime-kuma_backup_*/data/kuma_snapshot.db
 ```
 
-Il file `kuma_snapshot.db` dentro il backup è la copia atomica — usala per il
-restore al posto di `kuma.db` se quest'ultima dovesse essere corrotta.
+The `kuma_snapshot.db` file inside the backup is the atomic copy — use it for
+restore instead of `kuma.db` if the latter ends up corrupted.
