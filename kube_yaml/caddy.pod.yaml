@@ -4,8 +4,9 @@ metadata:
   name: caddy-pod
   labels:
     app: caddy
-    # For Podman auto-update (if desired, though re-playing YAML is common)
-    io.containers.autoupdate: "image"
+    # Podman auto-update — 'registry' is the documented value (Podman silently
+    # normalized the older 'image' to registry, but be explicit).
+    io.containers.autoupdate: "registry"
 spec:
   automountServiceAccountToken: false
   containers:
