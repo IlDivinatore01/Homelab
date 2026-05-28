@@ -46,7 +46,7 @@ Self-hosted infrastructure running on Podman with Systemd Quadlet integration.
 
 | Service | Reason |
 |---------|--------|
-| **Metabase** | No longer used. Data preserved in `data/metabase/`. To re-enable: rename `kube_yaml/metabase.pod.yaml.disabilitato` and re-add to `manage_finale.sh`. |
+| **Metabase** | No longer used. Data preserved in `data/metabase/`. To re-enable: rename `kube_yaml/metabase.pod.yaml.disabilitato` and re-add to `manage.sh`. |
 | **Actual Budget** | No longer used. Data preserved in `data/actual/`. Same re-enable procedure. |
 | **Immich Machine Learning** | Sub-container commented out in `kube_yaml/immich.pod.yaml` to free ~170MB RAM (Smart Search / Faces / OCR unused). Image + model cache kept on disk. Re-enable: uncomment the block + restart + flip the ML toggles in Immich admin UI. |
 
@@ -104,7 +104,7 @@ cp config_examples/Caddyfile.example data/caddy/Caddyfile
 ### Step 5: Start Services
 
 ```bash
-./manage_finale.sh
+./manage.sh
 # Select option 1, then 'a' for all
 ```
 
@@ -198,7 +198,7 @@ podman/
 │   ├── ARCHITETTURA.md      # Architecture (Italian)
 │   └── metabase_queries.md  # SQL queries for Metabase dashboards
 │
-├── manage_finale.sh         # Main management script
+├── manage.sh         # Main management script
 ├── .env                     # Gitignored - host secrets (S3 creds, etc.)
 ├── .env.example             # Template for .env
 ├── README.md                # This file
@@ -219,7 +219,7 @@ podman/
 ### Interactive Menu
 
 ```bash
-./manage_finale.sh
+./manage.sh
 ```
 
 Options:
@@ -239,11 +239,11 @@ Options:
 ### Non-Interactive Mode (cron / scripts)
 
 ```bash
-./manage_finale.sh --backup-all            # Backup every tracked service
-./manage_finale.sh --backup immich         # Backup a single service
-./manage_finale.sh --restart firefly       # Restart a service
-./manage_finale.sh --optimize-db           # VACUUM Postgres + mariadb-check
-./manage_finale.sh --help                  # Show usage
+./manage.sh --backup-all            # Backup every tracked service
+./manage.sh --backup immich         # Backup a single service
+./manage.sh --restart firefly       # Restart a service
+./manage.sh --optimize-db           # VACUUM Postgres + mariadb-check
+./manage.sh --help                  # Show usage
 ```
 
 `scripts/nightly_backup.sh` runs `--backup-all` daily at 03:00.

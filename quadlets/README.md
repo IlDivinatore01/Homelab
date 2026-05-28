@@ -35,7 +35,7 @@ mid-play, leaving half-created (wedged) pods and a corrupted state DB
 
 Mitigation: every `.kube` has `After=<previous>.service` so pods come up one
 at a time. The current chain (matches the order in `SERVICES` in
-`manage_finale.sh`):
+`manage.sh`):
 
 ```
 garage → caddy → ntfy → it-tools → portainer → uptime-kuma → homepage

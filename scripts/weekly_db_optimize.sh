@@ -1,6 +1,6 @@
 #!/bin/bash
 # Weekly database optimization (VACUUM ANALYZE for Postgres, mariadb-check for MariaDB).
-# Invoked from cron — uses the non-interactive entry point of manage_finale.sh
+# Invoked from cron — uses the non-interactive entry point of manage.sh
 # via the optimize_databases function inside it.
 
 set -uo pipefail
@@ -30,7 +30,7 @@ cd "$SCRIPT_DIR"
 
 # Source the manage script and call the function directly (non-interactive).
 # The main script gates the menu behind 'if [ $# -gt 0 ]' so passing a flag short-circuits it.
-if ./manage_finale.sh --optimize-db >> "$LOG_FILE" 2>&1; then
+if ./manage.sh --optimize-db >> "$LOG_FILE" 2>&1; then
     log "DB optimization completed successfully"
     EXIT=0
     DURATION=$(( $(date +%s) - START_TS ))

@@ -4,7 +4,7 @@ metadata:
   name: immich-server
   labels:
     app: immich
-    io.containers.autoupdate: "local" # valkey is tag+digest pinned (registry auto-update unsupported); Immich is updated deliberately via manage_finale.sh update_immich
+    io.containers.autoupdate: "local" # valkey is tag+digest pinned (registry auto-update unsupported); Immich is updated deliberately via manage.sh update_immich
 spec:
   automountServiceAccountToken: false
   containers:

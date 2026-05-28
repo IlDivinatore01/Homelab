@@ -166,7 +166,7 @@ podman exec uptime-kuma-pod-uptime-kuma sqlite3 /app/data/kuma.db \
 
 ## 7. Backup robusto (già automatico)
 
-`manage_finale.sh` ora prende un **snapshot atomico SQLite** (`.backup`) prima
+`manage.sh` ora prende un **snapshot atomico SQLite** (`.backup`) prima
 del rsync del data dir. Questo evita backup corrotti se Kuma sta scrivendo
 mentre parte il backup notturno. Niente da fare lato utente — è già attivo dal
 prossimo run di `--backup-all` o `--backup uptime-kuma`.
@@ -174,7 +174,7 @@ prossimo run di `--backup-all` o `--backup uptime-kuma`.
 Verifica al primo run:
 
 ```bash
-./manage_finale.sh --backup uptime-kuma
+./manage.sh --backup uptime-kuma
 # Cerca "Snapshot created." nel log
 ls -la backups/uptime-kuma_backup_*/data/kuma_snapshot.db
 ```

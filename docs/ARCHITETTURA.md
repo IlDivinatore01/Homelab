@@ -30,7 +30,7 @@ Abbiamo separato la gestione quotidiana dalla manutenzione straordinaria.
 | Componente | Nome | Ruolo (Analogia) | Funzione |
 | :--- | :--- | :--- | :--- |
 | **Systemd** | `*.service` | **Il Pilota Automatico** | Mantiene i siti online 24/7. Gestisce l'avvio e il riavvio automatico (es. Caddy). |
-| **Script** | `manage_finale.sh` | **Il Meccanico** | Si usa solo quando serve: per fare Backup, Aggiornamenti software o Pulizia del disco. |
+| **Script** | `manage.sh` | **Il Meccanico** | Si usa solo quando serve: per fare Backup, Aggiornamenti software o Pulizia del disco. |
 
 **Nota su Caddy:**
 Caddy (il Reverse Proxy) è gestito **esclusivamente** da Systemd per garantire che sia sempre attivo. Non viene toccato dallo script di aggiornamento per evitare conflitti di rete.
@@ -101,7 +101,7 @@ Ecco dove si trovano i pezzi fondamentali del tuo server:
   ⚙️ **Gli Interruttori (Quadlets)**
   Qui risiedono i file `.kube`. Questi file dicono a Linux di avviare automaticamente le ricette YAML al boot.
 
-* **`~/podman/manage_finale.sh`**
+* **`~/podman/manage.sh`**
   🛠️ **Il Pannello di Controllo**
   Lo script principale per eseguire backup, aggiornamenti, pulizia e manutenzione ordinaria.
   Supporta sia il menu interattivo (avvio senza argomenti) sia una modalità non-interattiva
@@ -119,7 +119,7 @@ Ecco dove si trovano i pezzi fondamentali del tuo server:
 
 * **`~/podman/backups/`**
   📦 **I Backup**
-  Dove vengono salvati i dump dei database e i file compressi generati dallo script `manage_finale.sh`.
+  Dove vengono salvati i dump dei database e i file compressi generati dallo script `manage.sh`.
   Rotazione locale: 3 backup per servizio. Rotazione remota su Garage S3: 5 backup per servizio.
 
 ---
@@ -130,7 +130,7 @@ I backup notturni partono via cron alle **03:00**, eseguendo lo script
 `scripts/nightly_backup.sh`, che a sua volta invoca:
 
 ```bash
-./manage_finale.sh --backup-all
+./manage.sh --backup-all
 ```
 
 La modalità `--backup-all` (non-interattiva) esegue in sequenza:
@@ -151,7 +151,7 @@ La modalità `--backup-all` (non-interattiva) esegue in sequenza:
 ### Manutenzione DB settimanale
 
 Ogni **domenica alle 04:30** parte `scripts/weekly_db_optimize.sh` (cron) che
-invoca `./manage_finale.sh --optimize-db`:
+invoca `./manage.sh --optimize-db`:
 
 - **Immich Postgres**: `VACUUM ANALYZE` (libera spazio, ricalcola le statistiche del planner)
 - **Firefly MariaDB**: `mariadb-check --optimize` (defrag tabelle InnoDB)
@@ -191,7 +191,7 @@ un `livenessProbe` nei rispettivi `*.pod.yaml`. Lo script
 
 > ⚠️ **Nota storica**
 > Fino a maggio 2026 il nightly invocava il menu interattivo via heredoc
-> (`./manage_finale.sh <<< "4"`), causando un falso fallimento perché `set -e`
+> (`./manage.sh <<< "4"`), causando un falso fallimento perché `set -e`
 > nello script principale terminava male alla chiusura di stdin. Il fix è la
 > modalità `--backup-all` introdotta in questa revisione.
 
@@ -202,7 +202,7 @@ un `livenessProbe` nei rispettivi `*.pod.yaml`. Lo script
 cat ~/podman/logs/nightly_backup_$(date +%Y-%m-%d).log
 
 # Backup remoti su Garage S3
-./manage_finale.sh   # opzione 9 — Restore / Download from S3
+./manage.sh   # opzione 9 — Restore / Download from S3
 ```
 
 ---

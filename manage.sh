@@ -978,9 +978,9 @@ main_menu() {
 }
 
 # --- NON-INTERACTIVE MODE (for cron / scripts) ---
-# Usage: ./manage_finale.sh --backup-all
-#        ./manage_finale.sh --backup <service>
-#        ./manage_finale.sh --restart <service>
+# Usage: ./manage.sh --backup-all
+#        ./manage.sh --backup <service>
+#        ./manage.sh --restart <service>
 run_non_interactive() {
   local cmd="$1"
   shift || true

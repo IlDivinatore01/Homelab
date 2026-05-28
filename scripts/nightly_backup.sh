@@ -29,7 +29,7 @@ START_TS=$(date +%s)
 
 cd "$SCRIPT_DIR"
 
-if ./manage_finale.sh --backup-all >> "$LOG_FILE" 2>&1; then
+if ./manage.sh --backup-all >> "$LOG_FILE" 2>&1; then
     log "Nightly backup completed successfully"
     EXIT=0
     DURATION=$(( $(date +%s) - START_TS ))

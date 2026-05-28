@@ -202,7 +202,7 @@ systemctl --user daemon-reload
 
 ```bash
 # Start all services
-./manage_finale.sh
+./manage.sh
 # Select option 1, then 'a' for all
 ```
 
@@ -237,14 +237,14 @@ rclone config
 
 ```bash
 # Interactive (manual run, picks one service)
-./manage_finale.sh
+./manage.sh
 # Select option 4 (Backup Immich) to test
 
 # Or non-interactive (single service)
-./manage_finale.sh --backup immich
+./manage.sh --backup immich
 
 # Or non-interactive (all services, what cron uses)
-./manage_finale.sh --backup-all
+./manage.sh --backup-all
 ```
 
 ### 8.3 Setup Cron Jobs
@@ -273,7 +273,7 @@ Add:
 ```
 
 The `nightly_backup.sh` and `weekly_db_optimize.sh` wrappers use the
-non-interactive `--backup-all` / `--optimize-db` modes of `manage_finale.sh`
+non-interactive `--backup-all` / `--optimize-db` modes of `manage.sh`
 (an older version piped `"4\n"` into the interactive menu, which caused cron
 to always report failure even when the backup actually succeeded).
 
