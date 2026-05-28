@@ -100,11 +100,11 @@ prompt_value() {
 # --- 1. Immich (Postgres) ---
 echo ""
 echo "=== Immich ==="
-create_k8s_secret immich-db-user-k8s     db_user.secret.yaml      username "postgres"
-create_k8s_secret immich-db-name-k8s     db_name.secret.yaml      dbname   "immich"
+create_k8s_secret immich-db-user-k8s     immich_db_user.secret.yaml      username "postgres"
+create_k8s_secret immich-db-name-k8s     immich_db_name.secret.yaml      dbname   "immich"
 if ! podman secret inspect immich-db-password-k8s &>/dev/null; then
     pw="$(prompt_value 'Immich DB password (Postgres)')"
-    [ -n "$pw" ] && create_k8s_secret immich-db-password-k8s db_password.secret.yaml password "$pw"
+    [ -n "$pw" ] && create_k8s_secret immich-db-password-k8s immich_db_password.secret.yaml password "$pw"
 else
     echo "[skip] 'immich-db-password-k8s' already exists."
 fi
@@ -112,13 +112,13 @@ fi
 # --- 2. Firefly III (MariaDB) ---
 echo ""
 echo "=== Firefly III ==="
-create_k8s_secret firefly-db-user-k8s    firefly_db_user.secret.yaml     username "firefly"
-create_k8s_secret firefly-db-name-k8s    firefly_db_name.secret.yaml     dbname   "firefly"
+create_k8s_secret firefly-db-user-k8s    firefly_immich_db_user.secret.yaml     username "firefly"
+create_k8s_secret firefly-db-name-k8s    firefly_immich_db_name.secret.yaml     dbname   "firefly"
 
 if ! podman secret inspect firefly-db-password-k8s &>/dev/null; then
     pw_auto="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
     echo "[auto] Generated Firefly DB password"
-    create_k8s_secret firefly-db-password-k8s firefly_db_password.secret.yaml password "$pw_auto"
+    create_k8s_secret firefly-db-password-k8s firefly_immich_db_password.secret.yaml password "$pw_auto"
 else
     echo "[skip] 'firefly-db-password-k8s' already exists."
 fi

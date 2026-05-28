@@ -65,6 +65,9 @@ SERVICES=(homepage site immich firefly firefly-importer uptime-kuma portainer fa
 # - actual   (budget):    no longer used, data still in data/actual/
 # To re-enable: move the .yaml back into kube_yaml/, add an entry to PODS
 # and SERVICES above, create a quadlets/<svc>.kube, then run verify_quadlets.
+# When PERMANENTLY removing a service: also wipe its backups, since
+# rotate_backups() only touches services still in SERVICES.
+#   rm -rf "$BACKUP_BASE_DIR/<svc>_backup_"*
 
 # --- LOGGING UTILS ---
 C_RESET='\033[0m'
