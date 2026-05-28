@@ -60,10 +60,11 @@ declare -A PODS=(
 )
 SERVICES=(homepage site immich firefly firefly-importer uptime-kuma portainer fastfood it-tools garage ntfy)
 
-# Servizi disabilitati (YAML rinominato .disabilitato, quadlet rimosso):
-# - metabase (analytics): non più usato, dati ancora in data/metabase/
-# - actual (budget):      non più usato, dati ancora in data/actual/
-# Per riattivare: rinominare il .yaml, ri-aggiungere a PODS/SERVICES, e rilanciare 'verify_quadlets'.
+# Disabled services (YAML kept in kube_yaml/disabled/, quadlet removed):
+# - metabase (analytics): no longer used, data still in data/metabase/
+# - actual   (budget):    no longer used, data still in data/actual/
+# To re-enable: move the .yaml back into kube_yaml/, add an entry to PODS
+# and SERVICES above, create a quadlets/<svc>.kube, then run verify_quadlets.
 
 # --- LOGGING UTILS ---
 C_RESET='\033[0m'
