@@ -1,0 +1,17 @@
+[Unit]
+Description=Auto-start for portainer
+Wants=network-online.target
+After=network-online.target
+After=it-tools.service
+
+[Kube]
+# Point to your existing YAML file
+Yaml=/home/osvaldo/podman/kube_yaml/portainer.pod.yaml
+# Ensure it attaches to your global network (services_net)
+Network=services_net
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

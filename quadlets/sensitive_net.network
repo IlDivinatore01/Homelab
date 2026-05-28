@@ -1,0 +1,10 @@
+[Unit]
+Description=Isolated network for sensitive data services (Firefly finances, Immich photos)
+
+[Network]
+NetworkName=sensitive_net
+Driver=bridge
+IPv6=true
+
+[Install]
+WantedBy=default.target

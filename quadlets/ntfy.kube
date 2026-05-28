@@ -1,0 +1,15 @@
+[Unit]
+Description=Auto-start for Ntfy Pod
+Wants=network-online.target
+After=network-online.target
+After=caddy.service
+
+[Kube]
+Yaml=/home/osvaldo/podman/kube_yaml/ntfy.pod.yaml
+Network=services_net
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

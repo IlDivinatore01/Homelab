@@ -1,0 +1,10 @@
+[Unit]
+Description=Shared Network for Web Services
+
+[Network]
+NetworkName=services_net
+Driver=bridge
+IPv6=true
+
+[Install]
+WantedBy=default.target

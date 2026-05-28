@@ -1,0 +1,19 @@
+[Unit]
+Description=Garage S3 Gateway Pod
+After=network-online.target
+Wants=network-online.target
+
+[Kube]
+Yaml=/home/osvaldo/podman/kube_yaml/garage.pod.yaml
+Network=services_net
+PublishPort=3900:3900
+PublishPort=3903:3903
+PublishPort=3909:3909
+
+[Service]
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

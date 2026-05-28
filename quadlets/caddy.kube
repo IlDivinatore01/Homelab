@@ -1,0 +1,19 @@
+[Unit]
+Description=Auto-start for caddy
+Wants=network-online.target
+After=network-online.target
+After=garage.service
+
+[Kube]
+# Point to your existing YAML file
+Yaml=/home/osvaldo/podman/kube_yaml/caddy.pod.yaml
+# Caddy is multi-homed: services_net for general apps, sensitive_net to reach
+# firefly/importer/homepage. It is the only bridge between the two zones.
+Network=services_net.network
+Network=sensitive_net.network
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

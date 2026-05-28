@@ -1,0 +1,19 @@
+[Unit]
+Description=Auto-start for immich
+Wants=network-online.target
+After=network-online.target
+After=fastfood.service
+
+[Kube]
+# Point to your existing YAML file
+Yaml=/home/osvaldo/podman/kube_yaml/immich.pod.yaml
+# Isolated network: Caddy reaches immich via host.containers.internal:2283
+# (host port), and homepage (multi-homed) reaches it by DNS here. Untrusted
+# app pods can no longer reach immich's Postgres.
+Network=sensitive_net.network
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

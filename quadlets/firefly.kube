@@ -1,0 +1,18 @@
+[Unit]
+Description=Auto-start for firefly
+Wants=network-online.target
+After=network-online.target
+After=immich.service
+
+[Kube]
+# Point to your existing YAML file
+Yaml=/home/osvaldo/podman/kube_yaml/firefly.pod.yaml
+# Isolated network: only Caddy + the importer (same net) can reach firefly's
+# MariaDB. Keeps untrusted app pods (it-tools/garage/...) off the finance DB.
+Network=sensitive_net.network
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

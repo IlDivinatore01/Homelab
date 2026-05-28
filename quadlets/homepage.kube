@@ -1,0 +1,21 @@
+[Unit]
+Description=Auto-start for homepage
+Wants=network-online.target
+After=network-online.target
+After=uptime-kuma.service
+
+[Kube]
+# Point to your existing YAML file
+Yaml=/home/osvaldo/podman/kube_yaml/homepage.pod.yaml
+# services_net only. The gethomepage next-server binds a single interface
+# (the primary net IP), so multi-homing breaks Caddy's inbound proxy (it would
+# resolve homepage-pod to the other net's IP). Sensitive-zone widgets instead
+# reach Immich via host.containers.internal (host port) and Firefly via its
+# public URL, so homepage needs no access to sensitive_net.
+Network=services_net.network
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

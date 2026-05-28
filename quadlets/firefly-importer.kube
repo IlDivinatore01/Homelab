@@ -1,0 +1,18 @@
+[Unit]
+Description=Auto-start for firefly-importer
+Wants=network-online.target
+After=network-online.target
+After=firefly.service
+
+[Kube]
+# Point to your existing YAML file
+Yaml=/home/osvaldo/podman/kube_yaml/firefly-importer.pod.yaml
+# Isolated network (same as firefly): reaches firefly-pod:8080 here; only Caddy
+# bridges in from outside.
+Network=sensitive_net.network
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

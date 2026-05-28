@@ -190,85 +190,46 @@ restart_caddy() {
 }
 
 bootstrap_quadlets() {
+  # Source-of-truth for *.kube and *.network units is $PODMAN_SETUP_DIR/quadlets/
+  # (under git). This function installs anything that has drifted into the
+  # active dir ~/.config/containers/systemd/ where systemd-quadlet looks for
+  # them. Always edit the SOURCE, never the live copy — live edits will be
+  # silently overwritten on the next bootstrap.
+  #
+  # Encoded statically in those files (see quadlets/README.md):
+  #   - boot order: After= chain that serializes 'podman kube play' at boot
+  #     so concurrent pods don't corrupt podman's sqlite state DB
+  #   - trust zones: Network=services_net.network (general) vs
+  #     Network=sensitive_net.network (firefly/immich); caddy is multi-homed
+  #   - TimeoutStartSec=300 to survive slow initial image pulls
   local systemd_dir="$HOME/.config/containers/systemd"
+  local src_dir="$PODMAN_SETUP_DIR/quadlets"
+
   mkdir -p "$systemd_dir"
 
-  # Create Network Quadlets if missing. Two trust zones:
-  #  - services_net : general / less-trusted app pods (it-tools, garage, ntfy, ...)
-  #  - sensitive_net: isolated zone for the data crown jewels (Firefly finances,
-  #    Immich photos). Untrusted pods on services_net cannot reach firefly's
-  #    MariaDB / immich's Postgres. Only Caddy (multi-homed) bridges in.
-  if [ ! -f "$systemd_dir/services_net.network" ]; then
-    info "Bootstrapping services_net.network..."
-    cat > "$systemd_dir/services_net.network" <<EOF
-[Network]
-NetworkName=services_net
-EOF
-  fi
-  if [ ! -f "$systemd_dir/sensitive_net.network" ]; then
-    info "Bootstrapping sensitive_net.network..."
-    cat > "$systemd_dir/sensitive_net.network" <<EOF
-[Network]
-NetworkName=sensitive_net
-EOF
+  if [ ! -d "$src_dir" ]; then
+    error "Quadlet source dir missing: $src_dir"
+    return 1
   fi
 
-  # Create Service Quadlets. Startup is SERIALIZED via an After= chain (each
-  # pod starts after the previous one) iterating SERVICES in order. Reason:
-  # at boot ~12 pods running 'podman kube play' concurrently contend on
-  # podman's sqlite state DB; the losers get SIGKILLed at the systemd start
-  # timeout mid-play, leaving half-created (wedged) pods AND corrupting the
-  # state DB (pod ps/rm then hang). Serializing + a 5min TimeoutStartSec
-  # eliminates the contention. (See docs/ARCHITETTURA + the 2026-05 recovery.)
-  local prev=""
-  for svc in "${SERVICES[@]}"; do
-    local kube_file="$systemd_dir/$svc.kube"
-    local yaml_path="${PODS[$svc]}"
-    local after_chain="After=network-online.target"
-    [ -n "$prev" ] && after_chain="After=network-online.target
-After=$prev.service"
-
-    # Network per trust zone. Referenced as '<net>.network' (quadlet unit name,
-    # not bare network name) so quadlet adds Requires=/After= on the network
-    # service -> robust boot ordering. firefly/importer/immich are isolated on
-    # sensitive_net; caddy is multi-homed to bridge both zones. homepage stays
-    # on services_net only (its next-server binds a single interface, so
-    # multi-homing breaks Caddy's inbound proxy) and reaches Immich via the host
-    # port instead.
-    local net_block
-    case "$svc" in
-      firefly|firefly-importer|immich)
-        net_block="Network=sensitive_net.network" ;;
-      caddy)
-        net_block=$'Network=services_net.network\nNetwork=sensitive_net.network' ;;
-      *)
-        net_block="Network=services_net.network" ;;
-    esac
-
-    if [ ! -f "$kube_file" ]; then
-      info "Bootstrapping $svc.kube (after: ${prev:-network})..."
-      cat > "$kube_file" <<EOF
-[Unit]
-Description=Auto-start for ${svc^} Pod
-Wants=network-online.target
-$after_chain
-
-[Kube]
-Yaml=$yaml_path
-$net_block
-
-[Service]
-TimeoutStartSec=300
-
-[Install]
-WantedBy=default.target
-EOF
+  local changed=0
+  shopt -s nullglob
+  for f in "$src_dir"/*.kube "$src_dir"/*.network; do
+    local dst="$systemd_dir/$(basename "$f")"
+    if ! cmp -s "$f" "$dst"; then
+      install -m 644 "$f" "$dst"
+      info "Installed $(basename "$f")"
+      changed=1
     fi
-    prev="$svc"
   done
-  
-  # Reload systemd to pick up new files
-  systemctl --user daemon-reload
+  shopt -u nullglob
+
+  if [ "$changed" -eq 1 ]; then
+    info "Reloading systemd user units..."
+    systemctl --user daemon-reload
+  else
+    info "Quadlets already in sync with $src_dir."
+  fi
 }
 
 verify_quadlets() {

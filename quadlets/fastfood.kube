@@ -1,0 +1,17 @@
+[Unit]
+Description=Auto-start for FastFood Pod
+Wants=network-online.target
+After=network-online.target
+After=site.service
+
+[Kube]
+# Point to your YAML file location on the VPS
+Yaml=/home/osvaldo/podman/kube_yaml/fastfood.pod.yaml
+# Attach to the global shared network
+Network=services_net
+
+[Service]
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target
