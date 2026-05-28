@@ -5,7 +5,7 @@ metadata:
   name: firefly-pod
   labels:
     app: firefly
-    io.containers.autoupdate: "image"
+    io.containers.autoupdate: "registry"
 spec:
   automountServiceAccountToken: false
   
@@ -109,10 +109,11 @@ spec:
       value: "equal"
     - name: TZ
       value: "Europe/Rome"
-    # Trust only the services_net subnet (Caddy reverse proxy lives there).
-    # "**" would let any client spoof X-Forwarded-For.
+    # Trust only the sensitive_net subnet — Caddy is multi-homed and reaches
+    # firefly from its sensitive_net IP, not services_net. "**" would let any
+    # client spoof X-Forwarded-For.
     - name: TRUSTED_PROXIES
-      value: "10.89.0.0/24"
+      value: "10.89.2.0/24"
     - name: LOG_CHANNEL
       value: "stack"
     - name: APP_LOG_LEVEL
