@@ -8,9 +8,25 @@ set -uo pipefail
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )/.." &> /dev/null && pwd )"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/healthcheck.log"
-STATE_FILE="$SCRIPT_DIR/logs/.healthcheck-last-state"
+# Flap-protection state — not a log; kept under state/ so 'rm logs/*' is safe.
+STATE_DIR="$SCRIPT_DIR/state"
+STATE_FILE="$STATE_DIR/healthcheck-last-state"
 
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" "$STATE_DIR"
+
+# One-shot migration: move the file from its previous logs/ location.
+if [ -f "$LOG_DIR/.healthcheck-last-state" ] && [ ! -f "$STATE_FILE" ]; then
+  mv "$LOG_DIR/.healthcheck-last-state" "$STATE_FILE"
+fi
+
+# Size-based rotation: this script runs every 5 min, so a daily filename would
+# create 288 tiny files/day. Instead append to a single file and rotate when
+# it crosses ~512 KB (~6k events at ~85 B avg), keeping one .1 backup
+# (~1 MB max footprint per service).
+LOG_MAX_BYTES=524288
+if [ -f "$LOG_FILE" ] && [ "$(stat -c %s "$LOG_FILE" 2>/dev/null || echo 0)" -gt "$LOG_MAX_BYTES" ]; then
+  mv -f "$LOG_FILE" "${LOG_FILE}.1"
+fi
 
 if [ -f "$SCRIPT_DIR/.env" ]; then
   set -a

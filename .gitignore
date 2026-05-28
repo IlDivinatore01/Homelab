@@ -66,3 +66,4 @@ create_firefly_secrets.sh
 *.secret.yaml
 
 site_sources/
+state/
