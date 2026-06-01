@@ -1,12 +1,15 @@
 # ===========================================
-# Caddy Reverse Proxy Configuration
+# Caddy Reverse Proxy Configuration (template)
 # ===========================================
-# Copy to data/caddy/Caddyfile and customize
+# Copy to data/caddy/Caddyfile and replace yourdomain.com with your domain.
+# This mirrors the live structure: a global JSON access log + per-site
+# 'import access_log' opt-in, plus a shared (secure_headers) snippet.
 
-# Global options: write access logs to a host-mounted file (JSON format).
-# Read by fail2ban for brute-force protection (see scripts/fail2ban/).
+# Global options: write access logs to a host-mounted file in JSON format.
+# fail2ban reads this file to ban brute-force login attempts (see
+# scripts/fail2ban/ in the repo).
 {
-    log access-log {
+    log default {
         output file /var/log/caddy/access.log {
             roll_size 50MiB
             roll_keep 10
@@ -14,6 +17,12 @@
         format json
         include http.log.access
     }
+}
+
+# Snippet to enable per-host access logging. Each site has to opt-in
+# via 'import access_log' for the global log block above to receive its events.
+(access_log) {
+    log
 }
 
 # Global security headers snippet
@@ -30,7 +39,9 @@
 # REPLACE yourdomain.com WITH YOUR DOMAIN
 # ===========================================
 
+# Immich (Photo Gallery)
 gallery.yourdomain.com {
+    import access_log
     encode zstd gzip
     reverse_proxy host.containers.internal:2283 {
         header_up X-Forwarded-Proto {scheme}
@@ -38,17 +49,23 @@ gallery.yourdomain.com {
     import secure_headers
 }
 
+# Homepage Dashboard
 home.yourdomain.com {
+    import access_log
     reverse_proxy homepage-pod:3000
     import secure_headers
 }
 
+# Main Website (www redirect)
 www.yourdomain.com {
+    import access_log
     header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     redir https://yourdomain.com{uri}
 }
 
+# Main Website
 yourdomain.com {
+    import access_log
     reverse_proxy main-pod:8080
     encode zstd gzip
     header {
@@ -60,31 +77,33 @@ yourdomain.com {
     }
 }
 
+# FastFood Application
 fastfood.yourdomain.com {
+    import access_log
     reverse_proxy fastfood-pod:3000
     encode zstd gzip
     import secure_headers
 }
 
+# Firefly III (Finance)
 finanza.yourdomain.com {
+    import access_log
     reverse_proxy firefly-pod:8080
     encode zstd gzip
     import secure_headers
 }
 
+# Firefly Importer
 importer.finanza.yourdomain.com {
+    import access_log
     reverse_proxy firefly-importer-pod:8080
     encode zstd gzip
     import secure_headers
 }
 
-analytics.yourdomain.com {
-    reverse_proxy metabase-pod:3000
-    encode zstd gzip
-    import secure_headers
-}
-
+# Uptime Kuma (Status Page)
 status.yourdomain.com {
+    import access_log
     reverse_proxy uptime-kuma-pod:3001 {
         header_up Upgrade {http.request.header.Upgrade}
         header_up Connection {http.request.header.Connection}
@@ -97,7 +116,9 @@ status.yourdomain.com {
     import secure_headers
 }
 
+# Portainer (Container Management)
 portainer.yourdomain.com {
+    import access_log
     reverse_proxy https://portainer-pod:9443 {
         transport http {
             tls
@@ -107,12 +128,16 @@ portainer.yourdomain.com {
     import secure_headers
 }
 
+# IT Tools
 tools.yourdomain.com {
+    import access_log
     reverse_proxy it-tools-pod:80
     import secure_headers
 }
 
+# Cockpit Panel
 panel.yourdomain.com {
+    import access_log
     reverse_proxy https://host.containers.internal:9090 {
         transport http {
             tls
@@ -122,8 +147,23 @@ panel.yourdomain.com {
     import secure_headers
 }
 
+# Garage S3 API
+s3.yourdomain.com {
+    import access_log
+    reverse_proxy garage-pod:3900
+    import secure_headers
+}
+
+# Garage WebUI
+garage.yourdomain.com {
+    import access_log
+    reverse_proxy garage-pod:3909
+    import secure_headers
+}
+
 # ntfy (Push Notifications)
 notify.yourdomain.com {
+    import access_log
     reverse_proxy ntfy-pod:80
     encode zstd gzip
     import secure_headers
