@@ -19,7 +19,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
     set +a
 fi
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/scripts/lib_notify.sh"
+source "$SCRIPT_DIR/lib/notify.sh"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"; }
 
