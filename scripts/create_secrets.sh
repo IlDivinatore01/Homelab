@@ -112,13 +112,13 @@ fi
 # --- 2. Firefly III (MariaDB) ---
 echo ""
 echo "=== Firefly III ==="
-create_k8s_secret firefly-db-user-k8s    firefly_immich_db_user.secret.yaml     username "firefly"
-create_k8s_secret firefly-db-name-k8s    firefly_immich_db_name.secret.yaml     dbname   "firefly"
+create_k8s_secret firefly-db-user-k8s    firefly_db_user.secret.yaml     username "firefly"
+create_k8s_secret firefly-db-name-k8s    firefly_db_name.secret.yaml     dbname   "firefly"
 
 if ! podman secret inspect firefly-db-password-k8s &>/dev/null; then
     pw_auto="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
     echo "[auto] Generated Firefly DB password"
-    create_k8s_secret firefly-db-password-k8s firefly_immich_db_password.secret.yaml password "$pw_auto"
+    create_k8s_secret firefly-db-password-k8s firefly_db_password.secret.yaml password "$pw_auto"
 else
     echo "[skip] 'firefly-db-password-k8s' already exists."
 fi
@@ -176,6 +176,34 @@ if ! podman secret inspect homepage-immich-key-k8s &>/dev/null; then
     fi
 else
     echo "[skip] 'homepage-immich-key-k8s' already exists."
+fi
+
+# --- 5. Garage WebUI (admin auth) ---
+# Stored as the full "user:bcrypt-hash" string under key 'userpass', read by
+# garage.pod.yaml via secretKeyRef. The webui container refuses to start if
+# this secret is missing, so create it before first boot.
+echo ""
+echo "=== Garage WebUI ==="
+if ! podman secret inspect garage-webui-auth &>/dev/null; then
+    if command -v htpasswd &>/dev/null; then
+        gu="$(prompt_value 'Garage WebUI admin username' 'admin')"
+        echo "[prompt] Garage WebUI admin password"
+        read -rsp "  Value: " gp; echo ""
+        if [ -n "$gp" ]; then
+            # htpasswd -nbBC 10 emits "user:$2y$10$..." — that whole line is the value.
+            userpass="$(htpasswd -nbBC 10 "$gu" "$gp")"
+            create_k8s_secret garage-webui-auth garage_webui_auth.secret.yaml userpass "$userpass"
+        else
+            echo "[skip] no password entered."
+        fi
+    else
+        echo "[warn] htpasswd not found (sudo apt install apache2-utils)."
+        echo "       Paste a pre-hashed 'user:bcrypt' line (see SETUP.md §8b.1), or leave blank to skip."
+        up="$(prompt_value 'Garage WebUI user:bcrypt string')"
+        [ -n "$up" ] && create_k8s_secret garage-webui-auth garage_webui_auth.secret.yaml userpass "$up"
+    fi
+else
+    echo "[skip] 'garage-webui-auth' already exists."
 fi
 
 # --- Summary ---
