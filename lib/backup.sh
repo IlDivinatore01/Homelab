@@ -340,25 +340,6 @@ backup_caddy() {
   sync_to_cloud "caddy" "$backup_dir"
 }
 
-backup_metabase() {
-  ensure_shared_network
-  check_dependencies
-  local METABASE_DATA_DIR="$PODMAN_SETUP_DIR/data/metabase"
-  local timestamp backup_dir
-  timestamp="$(date +%Y-%m-%d_%H-%M-%S)"
-  backup_dir="$BACKUP_BASE_DIR/metabase_backup_$timestamp"
-
-  title "BACKUP METABASE"
-  rotate_backups "metabase"
-  mkdir -p "$backup_dir"
-  info "Backing up Metabase H2 Database and config..."
-  # Metabase uses H2 embedded DB - just copy the data files
-  $NICE_CMD rsync -a --info=progress2 "$METABASE_DATA_DIR/" "$backup_dir/data/" && \
-    success "Metabase backup complete!"
-
-  sync_to_cloud "metabase" "$backup_dir"
-}
-
 download_from_s3() {
   if [ "$USE_S3_BACKUP" != true ]; then
     warn "S3 Backup is not enabled in configuration."

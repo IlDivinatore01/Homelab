@@ -243,6 +243,19 @@ EOF
      systemctl --user start $service.service
 EOF
       ;;
+    caddy)
+      cat <<EOF
+Caddy backup holds the Caddyfile + ACME state (certs/keys/accounts).
+1. Stop Caddy:
+     systemctl --user stop caddy.service
+2. Restore Caddyfile + ACME data:
+     rsync -av --delete "$FULL_PATH/data/" "$SCRIPT_DIR/data/caddy/"
+3. Start Caddy:
+     systemctl --user start caddy.service
+   Restoring the ACME state avoids re-requesting certs (Let's Encrypt
+   rate limits). If the certs are stale, Caddy will renew them on start.
+EOF
+      ;;
     *)
       warn "Unknown service '$service'. Inspect the backup manually:"
       ls -lh "$FULL_PATH" || true
